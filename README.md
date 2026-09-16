@@ -61,10 +61,49 @@ Başlangıç (şarj hiç açılmadan, dinlenmiş): **3255,2 mV**.
 | [`data/measurements.csv`](data/measurements.csv) | 13 ölçüm çifti, `relax_mv` ara noktaları dahil |
 | [`data/lookup.csv`](data/lookup.csv) | 10 mV adımlı arama tablosu — şarjdaki gerilimden dinlenmiş karşılığı |
 | [`data/raw_dump.log`](data/raw_dump.log) | Cihazdan alınan ham seri port çıktısı, hiç düzenlenmedi |
+| [`data/measurements-run2.csv`](data/measurements-run2.csv) | İkinci koşunun ölçüm çiftleri (devam ediyor) |
+| [`data/raw_dump-run2.log`](data/raw_dump-run2.log) | İkinci koşunun ham seri port çıktısı |
 | [`scripts/plot_voltage.py`](scripts/plot_voltage.py) | Grafikleri ve arama tablosunu üretir |
 
 `lookup.csv` yalnızca ölçülen aralığı (3430–4140 mV) doldurur; dışına **ekstrapolasyon
 yapılmaz**. Ara değerler parça-parça doğrusaldır.
+
+## İkinci ölçüm — 16 Eylül 2026 (devam ediyor)
+
+Aynı hücrede ikinci bir koşu. Düzenek aynı; tek fark ADC girişinin GPIO34 yerine
+**GPIO32**'de olması. İlk denemede gerilim bölücüde lehim köprüsü vardı, ADC sabit
+142 mV okuyordu; köprü giderilince değer yerine oturdu.
+
+Koşu 3366,8 mV'tan başladı, yani ilk eşik %40. Altı çift alındıktan sonra kart
+resetlendi; firmware koşuyu reset sonrası sürdürmediği için ölçüm burada kesildi.
+%70 ve üstü eşikler sonraki koşuda toplanıp buraya eklenecek.
+
+| # | Eşik % | Şarjda (mV) | Dinlenmiş (mV) | Fark (mV) | O ana kadar şarj |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 40 | 3519,1 | 3367,3 | 151,8 | 6 s |
+| 2 | 45 | 3556,2 | 3416,7 | 139,6 | 58 s |
+| 3 | 50 | 3608,0 | 3460,8 | 147,2 | 2 dk 02 s |
+| 4 | 55 | 3673,0 | 3519,4 | 153,6 | 3 dk 44 s |
+| 5 | 60 | 3722,7 | 3571,9 | 150,8 | 8 dk 33 s |
+| 6 | 65 | 3780,3 | 3632,8 | 147,6 | 15 dk 43 s |
+
+Başlangıç (şarj hiç açılmadan, dinlenmiş): **3366,8 mV**.
+
+### İki koşu birbirini tutuyor mu
+
+Ortak eşiklerde iki bağımsız koşunun şarj gerilimleri birkaç mV içinde örtüşüyor:
+
+| Eşik % | Şarjda run 1 | Şarjda run 2 | Fark | Dinlenmiş run 1 | Dinlenmiş run 2 | Fark |
+|---:|---:|---:|---:|---:|---:|---:|
+| 45 | 3558,6 | 3556,2 | −2,4 | 3415,9 | 3416,7 | +0,8 |
+| 50 | 3606,9 | 3608,0 | +1,1 | 3467,7 | 3460,8 | −6,9 |
+| 55 | 3663,9 | 3673,0 | +9,1 | 3519,7 | 3519,4 | −0,3 |
+| 60 | 3721,8 | 3722,7 | +0,9 | 3579,5 | 3571,9 | −7,6 |
+| 65 | 3784,1 | 3780,3 | −3,8 | 3645,6 | 3632,8 | −12,8 |
+
+Şarj gerilimleri ±9 mV, dinlenmiş gerilimler ±13 mV içinde. Fark (`delta_mv`) run 2'de
+ortalama ~8 mV daha yüksek; iki koşu arasında hücre yaşlanması, sıcaklık ve şarj akımı
+farkı için beklenen büyüklükte. Haritanın tekrarlanabilir olduğunun doğrudan kanıtı.
 
 ## Veri gerçekten tutarlı mı
 

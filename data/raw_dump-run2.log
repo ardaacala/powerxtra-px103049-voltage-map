@@ -1,0 +1,12 @@
+# SAVED,state=CHARGING,fault=NONE,elapsed_ms=1309006,rows=6
+# CONFIG,empty_mv=3000.00,full_mv=4200.00,divider=2.0000,gain=1.000000,offset_mv=0.00
+# BASELINE,elapsed_ms=0,battery_mv=3366.81,initial_rest_ms=0
+row,first_crossed_pct,threshold_pct,charge_elapsed_ms,rest_elapsed_ms,rest_duration_ms,total_charge_ms,charging_mv,rested_mv,delta_mv,complete,relax_mv
+1,35,40,6006,67006,61000,6006,3519.12,3367.31,151.81,1,3378.31;3378.81;3374.25;3370.94;3369.00;3370.69;3369.25
+2,45,45,119006,180006,61000,58006,3556.25,3416.69,139.56,1,3436.44;3432.44;3430.00;3427.00;3422.69;3419.25;3419.00
+3,50,50,244006,305006,61000,122006,3608.00,3460.81,147.19,1,3486.50;3483.31;3479.75;3476.62;3472.44;3471.44;3467.00
+4,55,55,407006,468006,61000,224006,3673.00,3519.44,153.56,1,3542.31;3539.00;3535.12;3530.38;3528.94;3523.69;3521.75
+5,60,60,757006,818006,61000,513006,3722.69,3571.88,150.81,1,3594.12;3591.44;3588.50;3583.31;3578.06;3576.31;3573.50
+6,65,65,1248006,1309006,61000,943006,3780.31,3632.75,147.56,1,3658.19;3653.31;3653.00;3650.25;3647.25;3643.06;3637.62
+# STATUS,state=IDLE,on=0,adc_mv=1824.66,battery_mv=3649.31,voltage_pct=54.11,next_pct=5,rest_remaining_s=0,elapsed_s=0,fault=NONE,switch_pin=0,est_rested_mv=,est_pct=,map_points=6
+# STATUS,state=IDLE,on=0,adc_mv=1823.81,battery_mv=3647.62,voltage_pct=53.97,next_pct=5,rest_remaining_s=0,elapsed_s=0,fault=NONE,switch_pin=0,est_rested_mv=,est_pct=,map_points=6
