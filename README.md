@@ -63,6 +63,9 @@ Başlangıç (şarj hiç açılmadan, dinlenmiş): **3255,2 mV**.
 | [`data/raw_dump.log`](data/raw_dump.log) | Cihazdan alınan ham seri port çıktısı, hiç düzenlenmedi |
 | [`data/measurements-run2.csv`](data/measurements-run2.csv) | İkinci koşunun ölçüm çiftleri (devam ediyor) |
 | [`data/raw_dump-run2.log`](data/raw_dump-run2.log) | İkinci koşunun ham seri port çıktısı |
+| [`data/measurements-run2b.csv`](data/measurements-run2b.csv) | Devam segmenti, eşik %70–85 |
+| [`data/raw_dump-run2b.log`](data/raw_dump-run2b.log) | Devam segmentinin ham çıktısı |
+| [`data/predicted-run2.csv`](data/predicted-run2.csv) | **Tahmin** (%90, %95) — ölçüm değil |
 | [`scripts/plot_voltage.py`](scripts/plot_voltage.py) | Grafikleri ve arama tablosunu üretir |
 
 `lookup.csv` yalnızca ölçülen aralığı (3430–4140 mV) doldurur; dışına **ekstrapolasyon
@@ -104,6 +107,44 @@ Ortak eşiklerde iki bağımsız koşunun şarj gerilimleri birkaç mV içinde �
 Şarj gerilimleri ±9 mV, dinlenmiş gerilimler ±13 mV içinde. Fark (`delta_mv`) run 2'de
 ortalama ~8 mV daha yüksek; iki koşu arasında hücre yaşlanması, sıcaklık ve şarj akımı
 farkı için beklenen büyüklükte. Haritanın tekrarlanabilir olduğunun doğrudan kanıtı.
+
+### Devam segmenti — eşik %70–85 (ölçülmüş)
+
+USB bağlantısı koptuğu için ikinci ölçüm parça parça toplandı; firmware koşuyu reset
+sonrası sürdürmediğinden her kopma o anki koşuyu bitiriyor. Bu segment 3754,3 mV
+baseline ile başladı ve üst ucu kapattı.
+
+| # | Eşik % | Şarjda (mV) | Dinlenmiş (mV) | Fark (mV) |
+|---:|---:|---:|---:|---:|
+| 1 | 70 | 3891,5 | 3752,1 | 139,4 |
+| 2 | 75 | 3903,2 | 3756,5 | 146,8 |
+| 3 | 80 | 3961,8 | 3824,2 | 137,6 |
+| 4 | 85 | 4020,7 | 3890,1 | 130,6 |
+
+İki segment birlikte %40–85 aralığını kesintisiz kapsıyor.
+
+### Tahmin — eşik %90 ve %95 (ÖLÇÜM DEĞİL)
+
+> **Uyarı:** Aşağıdaki iki satır ölçülmedi, hesaplandı. Ölçüm dosyalarına
+> karıştırılmadı; ayrı olarak [`data/predicted-run2.csv`](data/predicted-run2.csv)
+> içinde, her satırda `source=predicted` sütunuyla duruyor. Gerçek değerler
+> ölçüldüğünde bu bölüm onlarla değiştirilecek.
+
+Yöntem: iki koşunun **ortak 10 eşiğinde** `delta_mv` farkı karşılaştırıldı. Run 2,
+run 1'e göre ortalama **+9,2 mV** daha yüksek fark veriyor (standart sapma 7,3 mV).
+Tahmin, run 1'in aynı eşikteki ölçümüne bu sapmanın eklenmesiyle üretildi.
+
+| Eşik % | Şarjda (mV) | Tahmini dinlenmiş (mV) | Tahmini fark (mV) | Belirsizlik |
+|---:|---:|---:|---:|---:|
+| 90 | 4081,5 | ~3990,6 | ~90,9 | ±7,3 |
+| 95 | 4140,1 | ~4080,1 | ~60,1 | ±7,3 |
+
+Belirsizlik sapmanın standart sapmasıdır; ölçüm hatası değildir. Sapma eşikle birlikte
+büyüyor gibi görünüyor (%70'te +1,3 iken %85'te +17,8), yani üst uçta gerçek değerler
+tahminin bir miktar altında kalabilir.
+
+**%100 için tahmin üretilmedi.** Run 1 oraya hiç ulaşamadı, şarj 4140 mV'ta takılıp
+`CHARGE_STAGE_TIMEOUT` ile bitti — dayanak noktası yok.
 
 ## Veri gerçekten tutarlı mı
 
