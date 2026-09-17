@@ -349,13 +349,14 @@ def load_combined() -> list[dict]:
         } for r in csv.DictReader(handle)]
 
 
-def runs_by_source(rows: list[dict], value_key: str, src_key: str):
+def runs_by_source(rows: list[dict], value_key: str, src_key: str,
+                   x_key: str = "pct"):
     """(noktalar, olculdu_mu) parcalari; sinir noktasi iki parcada da yer alir
     ki duz ve kesikli bolumler arasinda bosluk kalmasin."""
     segments: list[tuple[list[tuple[float, float]], bool]] = []
     for row in rows:
         measured = row[src_key] == "measured"
-        point = (row["pct"], row[value_key])
+        point = (row[x_key], row[value_key])
         if segments and segments[-1][1] == measured:
             segments[-1][0].append(point)
         else:
@@ -477,6 +478,109 @@ def render_full_range(rows: list[dict], theme_name: str, svg: bool = False) -> P
     return path
 
 
+def load_soc_curve() -> list[dict]:
+    """soc_curve.py'nin urettigi gercek SoC eksenli tabloyu okur."""
+    path = ROOT / "data" / "soc-curve.csv"
+    with path.open(encoding="utf-8") as handle:
+        return [{
+            "soc": float(r["soc_pct"]),
+            "rested": float(r["rested_mv"]) / 1000,
+            "charging": float(r["charging_mv"]) / 1000,
+            "loaded": float(r["loaded_mv"]) / 1000,
+            "charging_src": r["charging_src"],
+            "loaded_src": r["loaded_src"],
+        } for r in csv.DictReader(handle)]
+
+
+def render_soc_curve(rows: list[dict], theme_name: str, svg: bool = False) -> Path:
+    """Uc durum, gercek sarj durumu ekseninde -- batarya egrisinin kendi sekli.
+
+    Gerilim indeksi ekseninde dinlenmis egri tanim geregi duz kosegen cikiyor
+    ve plato/diz sekli kayboluyor. SoC ekseni (desarj kosusunun coulomb
+    sayimindan) bunu ortaya cikarir.
+    """
+    t = THEMES[theme_name]
+    soc = [r["soc"] for r in rows]
+
+    fig, ax = plt.subplots(figsize=(10, 6.4))
+    fig.patch.set_facecolor(t["surface"])
+    ax.set_facecolor(t["surface"])
+    ax.grid(True, color=t["grid"], linewidth=0.8, zorder=0)
+    ax.set_axisbelow(True)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_color(t["grid"])
+    ax.tick_params(colors=t["muted"], labelsize=10)
+
+    for value_key, src_key, color, label in (
+        ("charging", "charging_src", t["charging"], "Şarj olurken (~0,5C)"),
+        ("rested", None, t["rested"], "Dinlenmiş / ortalama (açık devre)"),
+        ("loaded", "loaded_src", t["load"], "Deşarj, yük altında (~0,16C)"),
+    ):
+        if src_key is None:
+            ax.plot(soc, [r[value_key] for r in rows], color=color,
+                    linewidth=2, zorder=4, label=label)
+            continue
+        labelled = False
+        for points, measured in runs_by_source(rows, value_key, src_key, "soc"):
+            use_label = label if measured and not labelled else None
+            labelled = labelled or measured
+            ax.plot([p[0] for p in points], [p[1] for p in points],
+                    color=color, linewidth=2,
+                    linestyle="-" if measured else (0, (5, 3)),
+                    label=use_label, zorder=5 if measured else 4)
+
+    # Seri adlari dogrudan cizgi ucunda.
+    for label, value_key, dy, va in (("Şarj", "charging", 4, "bottom"),
+                                     ("Dinlenmiş", "rested", 0, "center"),
+                                     ("Deşarj", "loaded", -13, "top")):
+        ax.annotate(label, xy=(soc[-1], rows[-1][value_key]), xytext=(9, dy),
+                    textcoords="offset points", color=t["text"], fontsize=11,
+                    fontweight="bold", va=va, ha="left")
+
+    ax.set_title(
+        "Power-Xtra PX103049 — üç durum, gerçek şarj durumuna göre",
+        color=t["text"], fontsize=14, fontweight="bold", loc="left", pad=14,
+    )
+    ax.set_ylabel("Batarya gerilimi (V)", color=t["muted"], fontsize=11)
+    ax.set_xlabel("Şarj durumu (%) — coulomb sayımı, kullanılabilir pencere",
+                  color=t["muted"], fontsize=11)
+    ax.xaxis.set_major_locator(MultipleLocator(10))
+    ax.yaxis.set_major_locator(MultipleLocator(0.1))
+    ax.set_ylim(2.94, 4.06)
+    ax.set_xlim(0, 100)
+
+    legend = ax.legend(loc="upper left", frameon=False, fontsize=10.5)
+    for text in legend.get_texts():
+        text.set_color(t["text"])
+
+    # Iki ucun da neden kesildigini grafigin kendisi soylemeli. Egrilerin
+    # altindaki bos alana yerlesir: solda %18'den, sagda %97'ye dayali.
+    ax.annotate("%0 mutlak boş değil: hücre sağlığı için\n"
+                "2,5 V altına inilmiyor, koşu 3,07 V'ta durdu",
+                xy=(18, 3.30), color=t["muted"], fontsize=9.5,
+                ha="left", va="top")
+    ax.annotate("%100 = deşarj koşusunun başı (3,89 V).\n"
+                "Hücre şarjda 4,09 V'a kadar çıktı —\n"
+                "üstteki kapasite bu eksende yok.",
+                xy=(97, 3.02), color=t["muted"], fontsize=9.5,
+                ha="right", va="bottom")
+
+    fig.text(0.008, 0.015,
+             "SoC ekseni deşarj koşusunun coulomb sayımından (sabit dummy load, "
+             "yük-açık süresi). Kesikli = tahmin; ayrıntı README'de.",
+             color=t["muted"], fontsize=9)
+    fig.subplots_adjust(left=0.085, right=0.895, top=0.915, bottom=0.135)
+
+    OUT.mkdir(exist_ok=True)
+    name = "soc_curve.svg" if svg else f"soc_curve-{theme_name}.png"
+    path = OUT / name
+    fig.savefig(path, dpi=None if svg else 200, facecolor=t["surface"])
+    plt.close(fig)
+    return path
+
+
 def main() -> None:
     rows = load_rows()
     if not rows:
@@ -509,6 +613,17 @@ def main() -> None:
         ]
     else:
         print("uyari: data/lookup-combined.csv yok -> once scripts/predict_map.py")
+
+    soc_path = ROOT / "data" / "soc-curve.csv"
+    if soc_path.exists():
+        soc_rows = load_soc_curve()
+        written += [
+            render_soc_curve(soc_rows, "light"),
+            render_soc_curve(soc_rows, "dark"),
+            render_soc_curve(soc_rows, "light", svg=True),
+        ]
+    else:
+        print("uyari: data/soc-curve.csv yok -> once scripts/soc_curve.py")
 
     for path in written:
         print(path.relative_to(ROOT))
