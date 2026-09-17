@@ -13,6 +13,22 @@ Amacı basit: karakteristiği bilinmeyen bir bataryada okuduğun terminal gerili
 direnç ve polarizasyon yüzünden akımın yönüne göre kayar. Bu depo o kaymayı tek bir
 hücre için her iki yönde ölçülmüş sayılarla verir.
 
+### Grafiklerde gösterim
+
+Bütün grafiklerde aynı sözleşme geçerli — ölçüm ile tahmin gözle ayrılabilsin diye:
+
+| Görünüm | Anlamı |
+|---|---|
+| **İşaretçili düz çizgi** | Ölçülen çiftler. İşaretçiler gerçek ölçüm noktalarında, aralar doğrusal interpolasyon |
+| **Kesikli çizgi** | Tahmin — **yalnızca ölçüm aralığının dışında**, komşu ölçüm noktasına bağlı |
+| **İnce soluk çizgi** | Veri değil, **eksenin kendisi**. Ölçüm aralığının içinde hiçbir değer yeniden hesaplanmaz |
+
+Son satır önemli: `state_overlay` ve `full_range` grafiklerinde x ekseni zaten dinlenmiş
+gerilimin (ya da onun indeksinin) kendisi, dolayısıyla dinlenmiş çizgi tanım gereği
+`y = x` düz köşegenidir. Ölçülmüş bir eğri değildir, o yüzden ince/soluk çizilir ve
+legend'de seri olarak yer almaz. Gerçekten ölçülmüş dinlenmiş eğrisini görmek istersen
+kapasite eksenli grafiğe bak — orada dinlenmiş çizgi 16 ölçülen noktadan geçer.
+
 ## Kapasite eksenine göre — bataryanın kendi eğrisi
 
 Batarya veri sayfalarında gördüğün forma karşılık gelen grafik: x ekseni gerilim

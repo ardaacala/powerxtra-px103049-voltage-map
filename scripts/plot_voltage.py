@@ -267,9 +267,9 @@ def render_states(
     ax.fill_between(ld_x, ld_y, ld_x, color=t["load"], alpha=0.10,
                     linewidth=0, zorder=1)
 
-    # Referans cizgisi markersiz: noktalari diger iki serinin x'leriyle ayni.
-    ax.plot(ref_x, ref_x, color=t["rested"], linewidth=2, zorder=3,
-            label="Dinlenmiş (açık devre) — referans")
+    # Referans: bu eksende x zaten dinlenmis gerilim, yani bu cizgi tanim
+    # geregi y=x. Olculmus bir egri DEGIL -> ince, soluk, legend'e girmez.
+    ax.plot(ref_x, ref_x, color=t["rested"], linewidth=1, alpha=0.55, zorder=2)
     ax.plot(ch_x, ch_y, color=t["charging"], linewidth=2, marker="o",
             markersize=8, markeredgecolor=t["surface"], markeredgewidth=2,
             label="Şarj olurken (0,5C)", zorder=4)
@@ -277,15 +277,18 @@ def render_states(
             markersize=8, markeredgecolor=t["surface"], markeredgewidth=2,
             label="Yük altında deşarj olurken", zorder=4)
 
-    # Seri adlari dogrudan cizgi ucunda; metin murekkep renginde kalir.
+    # Olculen serilerin adlari dogrudan cizgi ucunda, murekkep renginde.
     for label, x, y, dy, va in (
         ("Şarj olurken", ch_x[-1], ch_y[-1], 3, "bottom"),
-        ("Dinlenmiş", ref_x[-1], ref_x[-1], -9, "top"),
         ("Yük altında", ld_x[-1], ld_y[-1], 0, "center"),
     ):
         ax.annotate(label, xy=(x, y), xytext=(9, dy), textcoords="offset points",
                     color=t["text"], fontsize=11, fontweight="bold",
                     va=va, ha="left")
+    # Referans cizgisi ayri tutulur: soluk ve kalin degil, cunku veri degil.
+    ax.annotate("dinlenmiş = eksen\n(veri değil)", xy=(ref_x[-1], ref_x[-1]),
+                xytext=(9, -9), textcoords="offset points", color=t["muted"],
+                fontsize=9.5, va="top", ha="left")
 
     ax.set_title(
         "Power-Xtra PX103049 — aynı hücre, üç durum: şarjda, dinlenmiş, yük altında",
@@ -300,7 +303,7 @@ def render_states(
         text.set_color(t["text"])
 
     # --- Alt panel: referanstan sapma ---------------------------------------
-    ax_delta.axhline(0, color=t["rested"], linewidth=2, zorder=3)
+    ax_delta.axhline(0, color=t["rested"], linewidth=1, alpha=0.55, zorder=2)
     ax_delta.plot(ch_x, [r["delta_mv"] for r in charge], color=t["charging"],
                   linewidth=2, marker="o", markersize=7,
                   markeredgecolor=t["surface"], markeredgewidth=2, zorder=4)
@@ -373,8 +376,19 @@ def runs_by_source(rows: list[dict], value_key: str, src_key: str,
     return segments
 
 
-def render_full_range(rows: list[dict], theme_name: str, svg: bool = False) -> Path:
-    """Uc durumu %0-100'un tamaminda gosterir; tahmin edilen kisimlar kesikli."""
+def render_full_range(rows: list[dict], charge: list[dict], discharge: list[dict],
+                      theme_name: str, svg: bool = False) -> Path:
+    """Uc durum, gerilim indeksi ekseninde. Olculen noktalar esas alinir.
+
+    Duz cizgiler yalnizca OLCULEN ciftleri birlestirir (isaretciler o
+    noktalarda). Kesikli kisim yalnizca son olculen noktanin OTESI, yani
+    tahmin edilen devam. Olculen degerler hicbir izgaraya yeniden
+    orneklenmez -- oldugu gibi cizilir.
+
+    Dinlenmis referans cizgisi veri serisi DEGIL: bu eksende x zaten
+    dinlenmis gerilimin indeksi, yani o cizgi tanim geregi duz kosegen.
+    O yuzden ince/soluk cizilir ve legend'e girmez.
+    """
     t = THEMES[theme_name]
     pcts = [r["pct"] for r in rows]
 
@@ -406,36 +420,49 @@ def render_full_range(rows: list[dict], theme_name: str, svg: bool = False) -> P
                 axis.axvspan(min(high), max(pcts), color=t["muted"],
                              alpha=0.07, linewidth=0, zorder=0)
 
-    series = (
-        ("charging", "charging_src", t["charging"], "Şarj olurken (~0,5C)"),
-        ("rested", None, t["rested"], "Dinlenmiş (açık devre) — referans"),
-        ("loaded", "loaded_src", t["load"], "Yük altında deşarj (~0,16C)"),
+    # Dinlenmis referans: veri degil, eksenin kendisi -> ince, soluk, legend yok.
+    have = [r for r in rows
+            if r["charging"] is not None or r["loaded"] is not None]
+    ax.plot([r["pct"] for r in have], [r["rested"] for r in have],
+            color=t["rested"], linewidth=1, alpha=0.55, zorder=2)
+
+    # Olculen ciftler: hicbir izgaraya orneklenmeden, oldugu gibi.
+    measured_series = (
+        ("charging_mv", charge, t["charging"], "Şarj olurken (~0,5C)"),
+        ("loaded_mv", discharge, t["load"], "Yük altında deşarj (~0,16C)"),
     )
-    for value_key, src_key, color, label in series:
-        if src_key is None:
-            # Referans cizgisi pct'nin tanimi, ama yalnizca diger iki serinin
-            # verisi olan araliga cizilir: alt ucta veri yokken tek basina
-            # uzanip orada bir sey olcmus gibi gorunmesin.
-            have = [r for r in rows
-                    if r["charging"] is not None or r["loaded"] is not None]
-            ax.plot([r["pct"] for r in have], [r[value_key] for r in have],
-                    color=color, linewidth=2, zorder=3, label=label)
-            continue
-        # Degeri olmayan satirlar (alt uc: veri yok) cizilmez.
-        present = [r for r in rows if r[value_key] is not None]
-        labelled = False
-        for points, measured in runs_by_source(present, value_key, src_key):
-            # Seri adi yalnizca ilk olculen parcaya verilir: renk kimligi
-            # legend'de bir kez gorunsun, kesikli parcalar tekrar etmesin.
-            use_label = label if measured and not labelled else None
-            labelled = labelled or measured
-            ax.plot([p[0] for p in points], [p[1] for p in points],
-                    color=color, linewidth=2,
-                    linestyle="-" if measured else (0, (5, 3)),
-                    label=use_label, zorder=4 if measured else 3)
+    ends: dict[str, tuple[tuple[float, float], tuple[float, float]]] = {}
+    for value_col, runs, color, label in measured_series:
+        xs = [voltage_pct(r["rested_mv"]) for r in runs]
+        ys = [r[value_col] / 1000 for r in runs]
+        ax.plot(xs, ys, color=color, linewidth=2, marker="o", markersize=7,
+                markeredgecolor=t["surface"], markeredgewidth=2,
+                label=label, zorder=5)
+        ends[value_col] = ((xs[0], ys[0]), (xs[-1], ys[-1]))
+
+    # Tahmin yalnizca olculen araligin DISINA cizilir ve komsu olculen
+    # noktaya baglanir. Olculen araligin *icinde* hicbir sey yeniden
+    # hesaplanmaz -- orada cizgi dogrudan olculen ciftleri birlestirir.
+    for value_col, value_key, src_key, color in (
+        ("charging_mv", "charging", "charging_src", t["charging"]),
+        ("loaded_mv", "loaded", "loaded_src", t["load"]),
+    ):
+        first, last = ends[value_col]
+        predicted = [(r["pct"], r[value_key]) for r in rows
+                     if r[value_key] is not None and r[src_key] != "measured"]
+        below = [p for p in predicted if p[0] < first[0]]
+        above = [p for p in predicted if p[0] > last[0]]
+        if below:
+            ax.plot([p[0] for p in below] + [first[0]],
+                    [p[1] for p in below] + [first[1]],
+                    color=color, linewidth=2, linestyle=(0, (5, 3)), zorder=3)
+        if above:
+            ax.plot([last[0]] + [p[0] for p in above],
+                    [last[1]] + [p[1] for p in above],
+                    color=color, linewidth=2, linestyle=(0, (5, 3)), zorder=3)
 
     ax.set_title(
-        "Power-Xtra PX103049 — üç durum, %0–100 tamamı (kesikli = tahmin)",
+        "Power-Xtra PX103049 — üç durum (nokta = ölçüm, kesikli = tahmin)",
         color=t["text"], fontsize=14, fontweight="bold", loc="left", pad=14,
     )
     ax.set_ylabel("Terminal gerilimi (V)", color=t["muted"], fontsize=11)
@@ -448,29 +475,46 @@ def render_full_range(rows: list[dict], theme_name: str, svg: bool = False) -> P
         text.set_color(t["text"])
     ax.add_artist(legend)
     style_key = ax.legend(handles=[
-        Line2D([], [], color=t["muted"], linewidth=2, label="ölçülmüş"),
+        Line2D([], [], color=t["muted"], linewidth=2, marker="o", markersize=7,
+               markeredgecolor=t["surface"], markeredgewidth=2,
+               label="ölçülen çift"),
         Line2D([], [], color=t["muted"], linewidth=2, linestyle=(0, (5, 3)),
-               label="tahmin"),
-    ], loc="lower right", frameon=False, fontsize=10.5)
+               label="tahmin — yalnızca ölçüm aralığı dışı"),
+        Line2D([], [], color=t["rested"], linewidth=1, alpha=0.55,
+               label="dinlenmiş = eksenin kendisi, veri değil"),
+    ], loc="lower right", frameon=False, fontsize=10)
     for text in style_key.get_texts():
         text.set_color(t["text"])
 
-    ax.annotate("Gri alanlar: veri yok — hücre dinlenmiş halde burada "
-                "hiç gözlenmedi, alt uçta tahmin de üretilmedi",
-                xy=(11, 2.975), color=t["muted"], fontsize=9.5,
-                ha="left", va="bottom")
+    # Gri bant dogrudan etiketlenir; ayri bir aciklama satiri gerekmez.
+    ax.annotate("veri yok", xy=(3.1, 3.62), color=t["muted"], fontsize=9.5,
+                rotation=90, ha="center", va="center")
 
     # --- Alt panel: referanstan sapma ---------------------------------------
-    ax_delta.axhline(0, color=t["rested"], linewidth=2, zorder=3)
-    for value_key, src_key, color in (("charging", "charging_src", t["charging"]),
-                                      ("loaded", "loaded_src", t["load"])):
-        deltas = [dict(r, d=(r[value_key] - r["rested"]) * 1000)
-                  for r in rows if r[value_key] is not None]
-        for points, measured in runs_by_source(deltas, "d", src_key):
-            ax_delta.plot([p[0] for p in points], [p[1] for p in points],
-                          color=color, linewidth=2,
-                          linestyle="-" if measured else (0, (5, 3)),
-                          zorder=4 if measured else 3)
+    # Sifir cizgisi de veri degil, referansin kendisi -> ince ve soluk.
+    ax_delta.axhline(0, color=t["rested"], linewidth=1, alpha=0.55, zorder=2)
+    for value_col, runs, color in (("charging_mv", charge, t["charging"]),
+                                   ("loaded_mv", discharge, t["load"])):
+        # Olculen sapma: dogrudan delta_mv sutunu (isareti yonden gelir).
+        xs = [voltage_pct(r["rested_mv"]) for r in runs]
+        ys = [r[value_col] - r["rested_mv"] for r in runs]
+        ax_delta.plot(xs, ys, color=color, linewidth=2, marker="o",
+                      markersize=6, markeredgecolor=t["surface"],
+                      markeredgewidth=1.8, zorder=5)
+        first, last = (xs[0], ys[0]), (xs[-1], ys[-1])
+        key = "charging" if value_col == "charging_mv" else "loaded"
+        src_key = f"{key}_src"
+        predicted = [(r["pct"], (r[key] - r["rested"]) * 1000) for r in rows
+                     if r[key] is not None and r[src_key] != "measured"]
+        for side, anchor in ((("below"), first), (("above"), last)):
+            seg = [p for p in predicted
+                   if (p[0] < anchor[0] if side == "below" else p[0] > anchor[0])]
+            if not seg:
+                continue
+            pts = seg + [anchor] if side == "below" else [anchor] + seg
+            ax_delta.plot([p[0] for p in pts], [p[1] for p in pts],
+                          color=color, linewidth=2, linestyle=(0, (5, 3)),
+                          zorder=3)
     ax_delta.set_ylabel("Dinlenmişten sapma (mV)", color=t["muted"], fontsize=11)
     ax_delta.set_xlabel("Gerilim ölçeği — dinlenmiş gerilimin indeksi (%) "
                         "— gerçek doluluk değil",
@@ -507,7 +551,9 @@ def load_window_curve() -> list[dict]:
         } for r in csv.DictReader(handle)]
 
 
-def render_window_curve(rows: list[dict], theme_name: str, svg: bool = False) -> Path:
+def render_window_curve(rows: list[dict], charge: list[dict],
+                        discharge: list[dict], theme_name: str,
+                        svg: bool = False) -> Path:
     """Uc durum, kapasite ekseninde -- batarya egrisinin kendi sekli.
 
     Gerilim indeksi ekseninde dinlenmis egri tanim geregi duz kosegen cikiyor
@@ -548,6 +594,32 @@ def render_window_curve(rows: list[dict], theme_name: str, svg: bool = False) ->
                     color=color, linewidth=2,
                     linestyle="-" if measured else (0, (5, 3)),
                     label=use_label, zorder=5 if measured else 4)
+
+    # Olculen ciftlerin nereye dustugunu goster: cizgi 101 noktalik izgarada
+    # ciziliyor, ama gercek olcum bunlar. Arasi interpolasyon.
+    inverse = sorted((r["rested"], r["window"]) for r in rows)
+
+    def window_at(rested_v: float) -> float | None:
+        for a, b in zip(inverse, inverse[1:]):
+            if a[0] <= rested_v <= b[0]:
+                span = b[0] - a[0]
+                f = 0.0 if span == 0 else (rested_v - a[0]) / span
+                return a[1] + f * (b[1] - a[1])
+        return None
+
+    for runs, value_col, color in ((charge, "charging_mv", t["charging"]),
+                                   (discharge, "loaded_mv", t["load"])):
+        pts = [(w, r[value_col] / 1000) for r in runs
+               if (w := window_at(r["rested_mv"] / 1000)) is not None]
+        if pts:
+            ax.plot([p[0] for p in pts], [p[1] for p in pts], linestyle="none",
+                    marker="o", markersize=6, color=color,
+                    markeredgecolor=t["surface"], markeredgewidth=1.8, zorder=6)
+    rest_pts = [(w, r["rested_mv"] / 1000) for r in discharge
+                if (w := window_at(r["rested_mv"] / 1000)) is not None]
+    ax.plot([p[0] for p in rest_pts], [p[1] for p in rest_pts], linestyle="none",
+            marker="o", markersize=6, color=t["rested"],
+            markeredgecolor=t["surface"], markeredgewidth=1.8, zorder=6)
 
     # Seri adlari dogrudan cizgi ucunda.
     for label, value_key, dy, va in (("Şarj", "charging", 4, "bottom"),
@@ -625,9 +697,9 @@ def main() -> None:
     if combined_path.exists():
         combined = load_combined()
         written += [
-            render_full_range(combined, "light"),
-            render_full_range(combined, "dark"),
-            render_full_range(combined, "light", svg=True),
+            render_full_range(combined, rows, discharge, "light"),
+            render_full_range(combined, rows, discharge, "dark"),
+            render_full_range(combined, rows, discharge, "light", svg=True),
         ]
     else:
         print("uyari: data/lookup-combined.csv yok -> once scripts/predict_map.py")
@@ -636,9 +708,9 @@ def main() -> None:
     if soc_path.exists():
         soc_rows = load_window_curve()
         written += [
-            render_window_curve(soc_rows, "light"),
-            render_window_curve(soc_rows, "dark"),
-            render_window_curve(soc_rows, "light", svg=True),
+            render_window_curve(soc_rows, rows, discharge, "light"),
+            render_window_curve(soc_rows, rows, discharge, "dark"),
+            render_window_curve(soc_rows, rows, discharge, "light", svg=True),
         ]
     else:
         print("uyari: data/window-curve.csv yok -> once scripts/window_curve.py")
