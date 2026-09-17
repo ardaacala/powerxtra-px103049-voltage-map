@@ -6,8 +6,14 @@ hucreyi kaynagina gore isaretler:
   measured      -> o yonun kendi olcumunden dogrusal interpolasyon
   bridged       -> DIGER yonun olcumunden, iki yon arasindaki sabit
                    rho oraniyla cevrildi (veriyle dogrulandi, ~%2 hata)
-  extrapolated  -> her iki yonun da verisi yok; o yonun rho egilimi
-                   dogrusal olarak uzatildi. En zayif sinif.
+  extrapolated  -> veri yok; o yonun rho egilimi uzatildi. YALNIZCA UST
+                   ucta kullanilir (sarj tavanina dogru daralma).
+  no_data       -> hucre bos. Alt uc icin ekstrapolasyon YAPILMAZ.
+
+ALT UC KURALI: olculen araligin altinda tahmin uretilmez. Onceki surum
+rho egilimini asagi uzatiyordu ve sarj sapmasini +204 mV'a cikariyordu;
+olculen en buyuk sapma 165,6 mV. Yani veride olmayan bir acilma
+uyduruluyordu. Artik alt sinirda tablo biter.
 
 Cikti:  data/lookup-combined.csv   (%1 adimli, 101 satir)
 Kullanim:  python scripts/predict_map.py
@@ -106,36 +112,81 @@ def delta_from_rho(rho_value: float, ocv: float, charging: bool) -> float:
     return rho_value * ocv / ((1000.0 - rho_value) if charging else (1000.0 + rho_value))
 
 
-def main() -> None:
+class Estimator:
+    """Verilen dinlenmis gerilimde uc durumu ve her birinin kaynagini verir.
+
+    soc_curve.py da bunu kullanir: iki script de dogrudan olcumden hesaplar,
+    yani birinin ciktisini digerine 12 mV'lik izgarayla aktarmaktan dogan
+    sinir kopmasi olmaz.
+    """
+
+    def __init__(self, charge, discharge) -> None:
+        self.charge, self.discharge = charge, discharge
+        self.ratio, self.ratio_sd = rho_ratio(charge, discharge)
+        self.lo_fit = lsq([o for o, _, _ in discharge],
+                          [rho(t, d) for _, t, d in discharge])
+        # Uzatma, uyumun *egimini* kullanir ama *seviyesini* olculen uc
+        # noktaya sabitler. Ham uyum sinirda olcumden ~%6 sapip grafikte
+        # yapay bir kirik yaratiyordu.
+        self._edge = (discharge[-1][0], rho(discharge[-1][1], discharge[-1][2]))
+        self.ch_lo, self.ch_hi = charge[0][0], charge[-1][0]
+        self.ld_lo, self.ld_hi = discharge[0][0], discharge[-1][0]
+
+    def rho_load_outside(self, ocv: float) -> float:
+        return self._edge[1] + self.lo_fit[1] * (ocv - self._edge[0])
+
+    def charging_at(self, ocv: float) -> tuple[float | None, str]:
+        d = interp(self.charge, ocv, 2)
+        if d is not None:
+            return min(ocv + d, CHARGER_CEILING_MV), "measured"
+
+        dl, tl = interp(self.discharge, ocv, 2), interp(self.discharge, ocv, 1)
+        if dl is not None and ocv <= CC_MAX_OCV:
+            d = delta_from_rho(self.ratio * rho(tl, dl), ocv, charging=True)
+            return min(ocv + d, CHARGER_CEILING_MV), "bridged"
+
+        if ocv > self.ch_hi:
+            # CV bolgesi: terminal gerilimi sarj tavanina dogru kapanir.
+            term = self.charge[-1][1] + \
+                (CHARGER_CEILING_MV - self.charge[-1][1]) * \
+                (ocv - self.ch_hi) / (CHARGER_CEILING_MV - self.ch_hi)
+            return min(term, CHARGER_CEILING_MV), "extrapolated"
+
+        return None, "no_data"   # alt uc: uydurulmaz
+
+    def loaded_at(self, ocv: float) -> tuple[float | None, str]:
+        d = interp(self.discharge, ocv, 2)
+        if d is not None:
+            return max(0.0, ocv - d), "measured"
+        if ocv > self.ld_hi:
+            # Kopru burada KULLANILMAZ: sarj kosusu bu bolgede CV'de oldugu
+            # icin oran gecersiz. Kendi rho egilimi uzatilir.
+            d = delta_from_rho(self.rho_load_outside(ocv), ocv, charging=False)
+            return max(0.0, ocv - d), "extrapolated"
+        return None, "no_data"   # alt uc: uydurulmaz
+
+
+def build_estimator() -> Estimator:
     charge, discharge = load_runs()
-    ratio, ratio_sd = rho_ratio(charge, discharge)
+    return Estimator(charge, discharge)
 
-    # Her yonun kendi rho egilimi -- olculen araligin disi icin.
-    lo_fit = lsq([o for o, _, _ in discharge], [rho(t, d) for _, t, d in discharge])
-    print(f"rho_yuk  = {lo_fit[0]:.3f} {lo_fit[1]:+.6f}*ocv   kalinti sd={lo_fit[2]:.2f}")
-    print(f"rho orani (sarj CC / yuk) = {ratio:.3f} +/- {ratio_sd:.3f}")
 
-    # Uzatma, uyumun *egimini* kullanir ama *seviyesini* olculen uc noktaya
-    # sabitler. Boylece sinirda sicrama olmaz; ham uyum orada olcumden
-    # ~%6 sapiyor ve grafikte yapay bir kirik yaratiyordu.
-    edge_lo = (discharge[0][0], rho(discharge[0][1], discharge[0][2]))
-    edge_hi = (discharge[-1][0], rho(discharge[-1][1], discharge[-1][2]))
-
-    def rho_load_outside(ocv: float) -> float:
-        anchor = edge_lo if ocv < edge_lo[0] else edge_hi
-        return anchor[1] + lo_fit[1] * (ocv - anchor[0])
+def main() -> None:
+    est = build_estimator()
+    print(f"rho_yuk  = {est.lo_fit[0]:.3f} {est.lo_fit[1]:+.6f}*ocv   "
+          f"kalinti sd={est.lo_fit[2]:.2f}")
+    print(f"rho orani (sarj CC / yuk) = {est.ratio:.3f} +/- {est.ratio_sd:.3f}")
 
     # Kopru dogrulamasi: sarjin en alt olculen noktasini yukten uretip karsilastir.
-    probe = charge[0][0]
-    rl = interp(discharge, probe, 2), interp(discharge, probe, 1)
-    if None not in rl:
-        est = delta_from_rho(ratio * rho(rl[1], rl[0]), probe, charging=True)
-        print(f"kopru dogrulamasi @ ocv={probe:.1f}: tahmin {est:.1f} mV, "
-              f"olculen {charge[0][2]:.1f} mV, hata {est - charge[0][2]:+.1f} mV")
+    probe = est.ch_lo
+    dl, tl = interp(est.discharge, probe, 2), interp(est.discharge, probe, 1)
+    if None not in (dl, tl):
+        d = delta_from_rho(est.ratio * rho(tl, dl), probe, charging=True)
+        print(f"kopru dogrulamasi @ ocv={probe:.1f}: tahmin {d:.1f} mV, "
+              f"olculen {est.charge[0][2]:.1f} mV, hata {d - est.charge[0][2]:+.1f} mV")
 
-    ch_lo, ch_hi = charge[0][0], charge[-1][0]
-    ld_lo, ld_hi = discharge[0][0], discharge[-1][0]
-    obs_lo, obs_hi = min(ch_lo, ld_lo), max(ch_hi, ld_hi)
+    obs_lo = min(est.ch_lo, est.ld_lo)
+    obs_hi = max(est.ch_hi, est.ld_hi)
 
     out = ROOT / "data" / "lookup-combined.csv"
     with out.open("w", encoding="utf-8", newline="") as handle:
@@ -143,50 +194,19 @@ def main() -> None:
         writer.writerow(["voltage_pct", "rested_mv", "charging_mv", "loaded_mv",
                          "charging_src", "loaded_src", "rested_observed"])
         for step in range(101):
-            pct = float(step)
-            ocv = rested_mv(pct)
-
-            # --- sarj yonu ---
-            d = interp(charge, ocv, 2)
-            if d is not None:
-                ch_src = "measured"
-            else:
-                dl, tl = interp(discharge, ocv, 2), interp(discharge, ocv, 1)
-                if dl is not None and ocv <= CC_MAX_OCV:
-                    # Diger yonun olcumu var: kopru.
-                    d = delta_from_rho(ratio * rho(tl, dl), ocv, charging=True)
-                    ch_src = "bridged"
-                elif ocv > ch_hi:
-                    # CV bolgesi: sarj tavanina dogru dogrusal kapanis.
-                    term = charge[-1][1] + (CHARGER_CEILING_MV - charge[-1][1]) * \
-                        (ocv - ch_hi) / (CHARGER_CEILING_MV - ch_hi)
-                    d = max(0.0, min(term, CHARGER_CEILING_MV) - ocv)
-                    ch_src = "extrapolated"
-                else:
-                    d = delta_from_rho(ratio * rho_load_outside(ocv), ocv,
-                                       charging=True)
-                    ch_src = "extrapolated"
-            charging = min(ocv + d, CHARGER_CEILING_MV)
-
-            # --- yuk yonu ---
-            d = interp(discharge, ocv, 2)
-            if d is not None:
-                ld_src = "measured"
-            else:
-                # Kopru burada KULLANILMAZ: ocv > 3883 bolgesinde sarj kosusu
-                # CV'de oldugu icin oran gecersiz. Kendi rho egilimi uzatilir.
-                d = delta_from_rho(rho_load_outside(ocv), ocv, charging=False)
-                ld_src = "extrapolated"
-            loaded = max(0.0, ocv - d)
-
+            ocv = rested_mv(float(step))
+            charging, ch_src = est.charging_at(ocv)
+            loaded, ld_src = est.loaded_at(ocv)
             writer.writerow([
-                f"{pct:.0f}", f"{ocv:.1f}", f"{charging:.1f}", f"{loaded:.1f}",
+                f"{step}", f"{ocv:.1f}",
+                "" if charging is None else f"{charging:.1f}",
+                "" if loaded is None else f"{loaded:.1f}",
                 ch_src, ld_src, "yes" if obs_lo <= ocv <= obs_hi else "no",
             ])
 
     print(f"\nyazildi: {out.relative_to(ROOT)}")
-    print(f"olculen sarj araligi : {ch_lo:.1f} - {ch_hi:.1f} mV (dinlenmis)")
-    print(f"olculen yuk araligi  : {ld_lo:.1f} - {ld_hi:.1f} mV (dinlenmis)")
+    print(f"olculen sarj araligi : {est.ch_lo:.1f} - {est.ch_hi:.1f} mV (dinlenmis)")
+    print(f"olculen yuk araligi  : {est.ld_lo:.1f} - {est.ld_hi:.1f} mV (dinlenmis)")
     print(f"hucrenin gozlendigi  : {obs_lo:.1f} - {obs_hi:.1f} mV (dinlenmis)")
 
 

@@ -341,8 +341,9 @@ def load_combined() -> list[dict]:
         return [{
             "pct": float(r["voltage_pct"]),
             "rested": float(r["rested_mv"]) / 1000,
-            "charging": float(r["charging_mv"]) / 1000,
-            "loaded": float(r["loaded_mv"]) / 1000,
+            # Alt ucta hucreler bos olabilir: veri yok, tahmin uretilmiyor.
+            "charging": float(r["charging_mv"]) / 1000 if r["charging_mv"] else None,
+            "loaded": float(r["loaded_mv"]) / 1000 if r["loaded_mv"] else None,
             "charging_src": r["charging_src"],
             "loaded_src": r["loaded_src"],
             "observed": r["rested_observed"] == "yes",
@@ -406,12 +407,18 @@ def render_full_range(rows: list[dict], theme_name: str, svg: bool = False) -> P
     )
     for value_key, src_key, color, label in series:
         if src_key is None:
-            # Referans: pct'nin tanimi, her yerde kesin -- tek parca duz cizgi.
-            ax.plot(pcts, [r[value_key] for r in rows], color=color,
-                    linewidth=2, zorder=3, label=label)
+            # Referans cizgisi pct'nin tanimi, ama yalnizca diger iki serinin
+            # verisi olan araliga cizilir: alt ucta veri yokken tek basina
+            # uzanip orada bir sey olcmus gibi gorunmesin.
+            have = [r for r in rows
+                    if r["charging"] is not None or r["loaded"] is not None]
+            ax.plot([r["pct"] for r in have], [r[value_key] for r in have],
+                    color=color, linewidth=2, zorder=3, label=label)
             continue
+        # Degeri olmayan satirlar (alt uc: veri yok) cizilmez.
+        present = [r for r in rows if r[value_key] is not None]
         labelled = False
-        for points, measured in runs_by_source(rows, value_key, src_key):
+        for points, measured in runs_by_source(present, value_key, src_key):
             # Seri adi yalnizca ilk olculen parcaya verilir: renk kimligi
             # legend'de bir kez gorunsun, kesikli parcalar tekrar etmesin.
             use_label = label if measured and not labelled else None
@@ -427,7 +434,7 @@ def render_full_range(rows: list[dict], theme_name: str, svg: bool = False) -> P
     )
     ax.set_ylabel("Terminal gerilimi (V)", color=t["muted"], fontsize=11)
     ax.yaxis.set_major_locator(MultipleLocator(0.1))
-    ax.set_ylim(2.88, 4.26)
+    ax.set_ylim(2.95, 4.26)
     ax.set_xlim(0, 100)
 
     legend = ax.legend(loc="upper left", frameon=False, fontsize=10.5)
@@ -442,15 +449,17 @@ def render_full_range(rows: list[dict], theme_name: str, svg: bool = False) -> P
     for text in style_key.get_texts():
         text.set_color(t["text"])
 
-    ax.annotate("Gri alanlar: hücre dinlenmiş halde burada hiç gözlenmedi",
-                xy=(13, 2.90), color=t["muted"], fontsize=9.5,
+    ax.annotate("Gri alanlar: veri yok — hücre dinlenmiş halde burada "
+                "hiç gözlenmedi, alt uçta tahmin de üretilmedi",
+                xy=(11, 2.975), color=t["muted"], fontsize=9.5,
                 ha="left", va="bottom")
 
     # --- Alt panel: referanstan sapma ---------------------------------------
     ax_delta.axhline(0, color=t["rested"], linewidth=2, zorder=3)
     for value_key, src_key, color in (("charging", "charging_src", t["charging"]),
                                       ("loaded", "loaded_src", t["load"])):
-        deltas = [dict(r, d=(r[value_key] - r["rested"]) * 1000) for r in rows]
+        deltas = [dict(r, d=(r[value_key] - r["rested"]) * 1000)
+                  for r in rows if r[value_key] is not None]
         for points, measured in runs_by_source(deltas, "d", src_key):
             ax_delta.plot([p[0] for p in points], [p[1] for p in points],
                           color=color, linewidth=2,

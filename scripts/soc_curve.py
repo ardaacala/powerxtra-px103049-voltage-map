@@ -16,15 +16,19 @@ Q ~ t varsayimi orada gecersiz. Sarj kosusunun gerilimleri OCV uzerinden bu
 eksene tasinir (OCV->SoC hucrenin ozelligi, yonden bagimsiz).
 
 Cikti:  data/soc-curve.csv
-Kullanim:  python scripts/soc_curve.py   (once predict_map.py calismis olmali)
+Kullanim:  python scripts/soc_curve.py
 """
 
 from __future__ import annotations
 
 import csv
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from predict_map import build_estimator  # noqa: E402  (ROOT kurulduktan sonra)
 
 # Desarj kosusunun baslangici: yuk hic baglanmadan okunan dinlenmis deger.
 # raw_dump-discharge.log icindeki "# BASELINE,...,battery_mv=3887.19"
@@ -85,42 +89,14 @@ def interp(points: list[tuple[float, float]], x: float) -> float | None:
     return None
 
 
-def load_combined() -> list[dict]:
-    path = ROOT / "data" / "lookup-combined.csv"
-    if not path.exists():
-        raise SystemExit("data/lookup-combined.csv yok -> once scripts/predict_map.py")
-    with path.open(encoding="utf-8") as h:
-        return list(csv.DictReader(h))
-
-
 def main() -> None:
     ocv_soc = soc_from_coulombs()
     soc_ocv = sorted((soc, ocv) for ocv, soc in ocv_soc)
-    combined = load_combined()
 
-    # OCV -> sarjda / yukte degerleri birlesik tablodan tasinir.
-    charging_pairs = sorted((float(r["rested_mv"]), float(r["charging_mv"]))
-                            for r in combined)
-    loaded_pairs = sorted((float(r["rested_mv"]), float(r["loaded_mv"]))
-                          for r in combined)
-
-    # Kaynak etiketi kosularin KENDI olculen araliklarindan hesaplanir.
-    # Birlesik tablonun %1'lik izgarasindan odunc alinirsa sinirda bir
-    # adim kayiyor (or. SoC %0'da yuk olcum oldugu halde extrapolated
-    # gorunuyordu).
-    ch_range = (3260.81, 4089.25)   # sarj kosusunun dinlenmis araligi
-    ld_range = (3074.19, 3883.00)   # desarj kosusunun dinlenmis araligi
-    CC_MAX_OCV = 3835.0             # kopru yalnizca sabit akim bolgesinde
-    TOL = 0.05                      # yuvarlama toleransi
-
-    def source(ocv: float, own: tuple[float, float],
-               other: tuple[float, float], can_bridge: bool) -> str:
-        if own[0] - TOL <= ocv <= own[1] + TOL:
-            return "measured"
-        if can_bridge and other[0] - TOL <= ocv <= other[1] + TOL \
-                and ocv <= CC_MAX_OCV:
-            return "bridged"
-        return "extrapolated"
+    # Sarjda/yukte degerleri ve kaynaklari dogrudan olcumden hesaplanir --
+    # lookup-combined.csv'nin 12 mV'lik izgarasindan odunc alinmaz, cunku
+    # o izgara veri sinirina denk gelmeyip SoC %0'i bos birakiyordu.
+    est = build_estimator()
 
     out = ROOT / "data" / "soc-curve.csv"
     with out.open("w", encoding="utf-8", newline="") as h:
@@ -128,18 +104,16 @@ def main() -> None:
         w.writerow(["soc_pct", "rested_mv", "charging_mv", "loaded_mv",
                     "charging_src", "loaded_src"])
         for step in range(101):
-            soc = float(step)
-            ocv = interp(soc_ocv, soc)
+            ocv = interp(soc_ocv, float(step))
             if ocv is None:
                 continue
-            ch = interp(charging_pairs, ocv)
-            ld = interp(loaded_pairs, ocv)
+            ch, ch_src = est.charging_at(ocv)
+            ld, ld_src = est.loaded_at(ocv)
             w.writerow([
-                f"{soc:.0f}", f"{ocv:.1f}",
+                f"{step}", f"{ocv:.1f}",
                 "" if ch is None else f"{ch:.1f}",
                 "" if ld is None else f"{ld:.1f}",
-                source(ocv, ch_range, ld_range, can_bridge=True),
-                source(ocv, ld_range, ch_range, can_bridge=False),
+                ch_src, ld_src,
             ])
 
     print(f"yazildi: {out.relative_to(ROOT)}")
