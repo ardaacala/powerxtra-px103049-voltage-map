@@ -22,6 +22,7 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from matplotlib.ticker import MultipleLocator
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -333,6 +334,149 @@ def render_states(
     return path
 
 
+def load_combined() -> list[dict]:
+    """predict_map.py'nin urettigi birlesik tabloyu okur (olcum + tahmin)."""
+    path = ROOT / "data" / "lookup-combined.csv"
+    with path.open(encoding="utf-8") as handle:
+        return [{
+            "pct": float(r["voltage_pct"]),
+            "rested": float(r["rested_mv"]) / 1000,
+            "charging": float(r["charging_mv"]) / 1000,
+            "loaded": float(r["loaded_mv"]) / 1000,
+            "charging_src": r["charging_src"],
+            "loaded_src": r["loaded_src"],
+            "observed": r["rested_observed"] == "yes",
+        } for r in csv.DictReader(handle)]
+
+
+def runs_by_source(rows: list[dict], value_key: str, src_key: str):
+    """(noktalar, olculdu_mu) parcalari; sinir noktasi iki parcada da yer alir
+    ki duz ve kesikli bolumler arasinda bosluk kalmasin."""
+    segments: list[tuple[list[tuple[float, float]], bool]] = []
+    for row in rows:
+        measured = row[src_key] == "measured"
+        point = (row["pct"], row[value_key])
+        if segments and segments[-1][1] == measured:
+            segments[-1][0].append(point)
+        else:
+            if segments:
+                segments[-1][0].append(point)  # sinirda kopma olmasin
+            segments.append(([point], measured))
+    return segments
+
+
+def render_full_range(rows: list[dict], theme_name: str, svg: bool = False) -> Path:
+    """Uc durumu %0-100'un tamaminda gosterir; tahmin edilen kisimlar kesikli."""
+    t = THEMES[theme_name]
+    pcts = [r["pct"] for r in rows]
+
+    fig, (ax, ax_delta) = plt.subplots(
+        2, 1, figsize=(10, 7.4), sharex=True,
+        gridspec_kw=dict(height_ratios=[3.1, 1], hspace=0.13),
+    )
+    fig.patch.set_facecolor(t["surface"])
+    for axis in (ax, ax_delta):
+        axis.set_facecolor(t["surface"])
+        axis.grid(True, color=t["grid"], linewidth=0.8, zorder=0)
+        axis.set_axisbelow(True)
+        for side in ("top", "right"):
+            axis.spines[side].set_visible(False)
+        for side in ("left", "bottom"):
+            axis.spines[side].set_color(t["grid"])
+        axis.tick_params(colors=t["muted"], labelsize=10)
+
+    # Hucrenin dinlenmis halde hic gozlenmedigi uclar: her iki panelde isaretli.
+    unobserved = [r["pct"] for r in rows if not r["observed"]]
+    if unobserved:
+        low = [p for p in unobserved if p < 50]
+        high = [p for p in unobserved if p >= 50]
+        for axis in (ax, ax_delta):
+            if low:
+                axis.axvspan(min(pcts), max(low), color=t["muted"],
+                             alpha=0.07, linewidth=0, zorder=0)
+            if high:
+                axis.axvspan(min(high), max(pcts), color=t["muted"],
+                             alpha=0.07, linewidth=0, zorder=0)
+
+    series = (
+        ("charging", "charging_src", t["charging"], "Şarj olurken (~0,5C)"),
+        ("rested", None, t["rested"], "Dinlenmiş (açık devre) — referans"),
+        ("loaded", "loaded_src", t["load"], "Yük altında deşarj (~0,16C)"),
+    )
+    for value_key, src_key, color, label in series:
+        if src_key is None:
+            # Referans: pct'nin tanimi, her yerde kesin -- tek parca duz cizgi.
+            ax.plot(pcts, [r[value_key] for r in rows], color=color,
+                    linewidth=2, zorder=3, label=label)
+            continue
+        labelled = False
+        for points, measured in runs_by_source(rows, value_key, src_key):
+            # Seri adi yalnizca ilk olculen parcaya verilir: renk kimligi
+            # legend'de bir kez gorunsun, kesikli parcalar tekrar etmesin.
+            use_label = label if measured and not labelled else None
+            labelled = labelled or measured
+            ax.plot([p[0] for p in points], [p[1] for p in points],
+                    color=color, linewidth=2,
+                    linestyle="-" if measured else (0, (5, 3)),
+                    label=use_label, zorder=4 if measured else 3)
+
+    ax.set_title(
+        "Power-Xtra PX103049 — üç durum, %0–100 tamamı (kesikli = tahmin)",
+        color=t["text"], fontsize=14, fontweight="bold", loc="left", pad=14,
+    )
+    ax.set_ylabel("Terminal gerilimi (V)", color=t["muted"], fontsize=11)
+    ax.yaxis.set_major_locator(MultipleLocator(0.1))
+    ax.set_ylim(2.88, 4.26)
+    ax.set_xlim(0, 100)
+
+    legend = ax.legend(loc="upper left", frameon=False, fontsize=10.5)
+    for text in legend.get_texts():
+        text.set_color(t["text"])
+    ax.add_artist(legend)
+    style_key = ax.legend(handles=[
+        Line2D([], [], color=t["muted"], linewidth=2, label="ölçülmüş"),
+        Line2D([], [], color=t["muted"], linewidth=2, linestyle=(0, (5, 3)),
+               label="tahmin"),
+    ], loc="lower right", frameon=False, fontsize=10.5)
+    for text in style_key.get_texts():
+        text.set_color(t["text"])
+
+    ax.annotate("Gri alanlar: hücre dinlenmiş halde burada hiç gözlenmedi",
+                xy=(13, 2.90), color=t["muted"], fontsize=9.5,
+                ha="left", va="bottom")
+
+    # --- Alt panel: referanstan sapma ---------------------------------------
+    ax_delta.axhline(0, color=t["rested"], linewidth=2, zorder=3)
+    for value_key, src_key, color in (("charging", "charging_src", t["charging"]),
+                                      ("loaded", "loaded_src", t["load"])):
+        deltas = [dict(r, d=(r[value_key] - r["rested"]) * 1000) for r in rows]
+        for points, measured in runs_by_source(deltas, "d", src_key):
+            ax_delta.plot([p[0] for p in points], [p[1] for p in points],
+                          color=color, linewidth=2,
+                          linestyle="-" if measured else (0, (5, 3)),
+                          zorder=4 if measured else 3)
+    ax_delta.set_ylabel("Dinlenmişten sapma (mV)", color=t["muted"], fontsize=11)
+    ax_delta.set_xlabel("Gerilim ölçeği — dinlenmiş gerilimin indeksi (%) "
+                        "— gerçek doluluk değil",
+                        color=t["muted"], fontsize=11)
+    ax_delta.xaxis.set_major_locator(MultipleLocator(10))
+    ax_delta.yaxis.set_major_locator(MultipleLocator(50))
+    ax_delta.set_ylim(-130, 230)
+
+    fig.text(0.008, 0.012,
+             "Ölçüm: şarj 13 çift + yük 15 çift. Tahmin yöntemi ve belirsizliği "
+             "README'de; hücre başına sayılar data/lookup-combined.csv'de.",
+             color=t["muted"], fontsize=9)
+    fig.subplots_adjust(left=0.085, right=0.975, top=0.925, bottom=0.105)
+
+    OUT.mkdir(exist_ok=True)
+    name = "full_range.svg" if svg else f"full_range-{theme_name}.png"
+    path = OUT / name
+    fig.savefig(path, dpi=None if svg else 200, facecolor=t["surface"])
+    plt.close(fig)
+    return path
+
+
 def main() -> None:
     rows = load_rows()
     if not rows:
@@ -354,6 +498,18 @@ def main() -> None:
         write_lookup(build_map(discharge, "loaded_mv"),
                      name="lookup-discharge.csv", first_col="loaded_mv"),
     ]
+
+    combined_path = ROOT / "data" / "lookup-combined.csv"
+    if combined_path.exists():
+        combined = load_combined()
+        written += [
+            render_full_range(combined, "light"),
+            render_full_range(combined, "dark"),
+            render_full_range(combined, "light", svg=True),
+        ]
+    else:
+        print("uyari: data/lookup-combined.csv yok -> once scripts/predict_map.py")
+
     for path in written:
         print(path.relative_to(ROOT))
 
