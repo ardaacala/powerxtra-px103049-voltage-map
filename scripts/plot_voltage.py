@@ -5,8 +5,9 @@ Girdiler:
   data/measurements-discharge.csv  -> desarj kosusu (15 cift, yuk yonu)
 
 Ciktilar:
-  graphs/voltage_overlay-light.png / -dark.png / .svg -> sarj + dinlenmis
-  graphs/state_overlay-light.png / -dark.png / .svg   -> uc durum ust uste
+  graphs/voltage_overlay-light.png / -dark.png / .svg   -> sarj + dinlenmis
+  graphs/discharge_overlay-light.png / -dark.png / .svg -> yuk + toparlanmis
+  graphs/state_overlay-light.png / -dark.png / .svg     -> uc durum ust uste
   data/lookup.csv                                     -> sarjdaki gerilim -> dinlenmis
   data/lookup-discharge.csv                           -> yuk altindaki gerilim -> dinlenmis
 
@@ -217,6 +218,102 @@ def render(rows: list[dict], theme_name: str, svg: bool = False) -> Path:
     return path
 
 
+def render_discharge(rows: list[dict], theme_name: str, svg: bool = False) -> Path:
+    """render()'in yuk yonundeki esi: ayni duzen, ayni eksen, ters yon.
+
+    Sarj grafigiyle ayni eksende (esik %) ayri cizilir, ustune bindirilmez:
+    esik zaten olculen terminal geriliminde tetiklendigi icin `charging_mv`
+    ile `loaded_mv` ortak esiklerde 3-20 mV icinde cakisiyor. Ust uste
+    konsa iki egri birbirini ortup hicbir sey gostermezdi; ayri cizilince
+    her yonun kendi sapmasi okunabiliyor.
+    """
+    t = THEMES[theme_name]
+    rows = sorted(rows, key=lambda r: r["threshold_pct"])
+    x = [r["threshold_pct"] for r in rows]
+    loaded = [r["loaded_mv"] / 1000 for r in rows]
+    recovered = [r["rested_mv"] / 1000 for r in rows]
+    delta = [r["delta_mv"] for r in rows]
+
+    fig, (ax, ax_delta) = plt.subplots(
+        2, 1, figsize=(10, 7.4), sharex=True,
+        gridspec_kw=dict(height_ratios=[3.1, 1], hspace=0.13),
+    )
+    fig.patch.set_facecolor(t["surface"])
+    for axis in (ax, ax_delta):
+        axis.set_facecolor(t["surface"])
+        axis.grid(True, color=t["grid"], linewidth=0.8, zorder=0)
+        axis.set_axisbelow(True)
+        for side in ("top", "right"):
+            axis.spines[side].set_visible(False)
+        for side in ("left", "bottom"):
+            axis.spines[side].set_color(t["grid"])
+        axis.tick_params(colors=t["muted"], labelsize=10)
+
+    # --- Ust panel: iki gerilim ust uste -------------------------------------
+    # Bu yonde toparlanmis deger yuk altindakinin USTUNDE kalir.
+    ax.fill_between(x, loaded, recovered, color=t["load"], alpha=0.10,
+                    linewidth=0, zorder=1)
+    ax.plot(x, recovered, color=t["rested"], linewidth=2, marker="o",
+            markersize=8, markeredgecolor=t["surface"], markeredgewidth=2,
+            label="1 dk toparlanmış", zorder=3)
+    ax.plot(x, loaded, color=t["load"], linewidth=2, marker="o",
+            markersize=8, markeredgecolor=t["surface"], markeredgewidth=2,
+            label="Yük altında", zorder=3)
+
+    ax.annotate("1 dk toparlanmış", xy=(x[-1], recovered[-1]), xytext=(9, 3),
+                textcoords="offset points", color=t["text"], fontsize=11,
+                fontweight="bold", va="bottom", ha="left")
+    ax.annotate("Yük altında", xy=(x[-1], loaded[-1]), xytext=(9, -3),
+                textcoords="offset points", color=t["text"], fontsize=11,
+                fontweight="bold", va="top", ha="left")
+
+    ax.set_title(
+        "Power-Xtra PX103049 (3,7 V / 1500 mAh Li-Po) — yük altında ve "
+        "toparlanmış gerilim",
+        color=t["text"], fontsize=13.5, fontweight="bold", loc="left", pad=14,
+    )
+    ax.set_ylabel("Batarya gerilimi (V)", color=t["muted"], fontsize=11)
+    ax.yaxis.set_major_locator(MultipleLocator(0.1))
+    ax.set_ylim(2.94, 3.96)
+    ax.set_xlim(-4, 76)
+    legend = ax.legend(loc="upper left", frameon=False, fontsize=10.5)
+    for text in legend.get_texts():
+        text.set_color(t["text"])
+
+    # Firmware'in bos kabulu: sarj grafigindeki 4,20 V tavaninin karsiligi.
+    ax.axhline(3.0, color=t["muted"], linewidth=1, linestyle=(0, (4, 4)), zorder=2)
+    ax.annotate("3,00 V — firmware'in boş kabulü; koşu yük altında 2,99 V'ta bitti",
+                xy=(-3, 3.0), xytext=(0, 6), textcoords="offset points",
+                color=t["muted"], fontsize=9.5, va="bottom", ha="left")
+
+    # --- Alt panel: aradaki fark ---------------------------------------------
+    ax_delta.plot(x, delta, color=t["load"], linewidth=2, marker="o",
+                  markersize=7, markeredgecolor=t["surface"], markeredgewidth=2,
+                  zorder=3)
+    ax_delta.set_ylabel("Fark (mV)", color=t["muted"], fontsize=11)
+    ax_delta.set_xlabel("Gerilim ölçeği eşiği (%) — gerçek doluluk değil",
+                        color=t["muted"], fontsize=11)
+    ax_delta.xaxis.set_major_locator(MultipleLocator(5))
+    ax_delta.set_ylim(-100, 0)
+
+    # Sarj yonunun tersi: sapma bosaldikca BUYUYOR, cunku ic direnc artiyor.
+    ax_delta.annotate("boşaldıkça büyüyor: −46 → −80 mV", xy=(38, -88),
+                      color=t["text"], fontsize=10, ha="center", va="center")
+
+    fig.text(0.008, 0.012,
+             "15 ölçüm çifti — aynı düzenek, anahtarın ucunda sabit dummy load. "
+             "Dinlenme 60 s; ADC kalibre edilmedi.",
+             color=t["muted"], fontsize=9)
+    fig.subplots_adjust(left=0.085, right=0.845, top=0.925, bottom=0.105)
+
+    OUT.mkdir(exist_ok=True)
+    name = "discharge_overlay.svg" if svg else f"discharge_overlay-{theme_name}.png"
+    path = OUT / name
+    fig.savefig(path, dpi=None if svg else 200, facecolor=t["surface"])
+    plt.close(fig)
+    return path
+
+
 def render_states(
     charge: list[dict], discharge: list[dict], theme_name: str, svg: bool = False
 ) -> Path:
@@ -351,6 +448,9 @@ def main() -> None:
     if not discharge:
         raise SystemExit("data/measurements-discharge.csv icinde tamamlanmis olcum yok.")
     written += [
+        render_discharge(discharge, "light"),
+        render_discharge(discharge, "dark"),
+        render_discharge(discharge, "light", svg=True),
         render_states(rows, discharge, "light"),
         render_states(rows, discharge, "dark"),
         render_states(rows, discharge, "light", svg=True),

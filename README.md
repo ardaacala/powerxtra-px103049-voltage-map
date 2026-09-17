@@ -60,6 +60,25 @@ Sebebi akım farkı — şarj ~0,5C (≈750 mA) ile yapıldı, yük ise sabit bi
 Alt panel bu farkı ayrıca çizer: sabit akım (CC) boyunca ~140 mV'ta sabit kalıyor,
 şarj sabit gerilim (CV) aşamasına geçip akım azaldıkça 51 mV'a kadar kapanıyor.
 
+## Deşarj yönü ayrıntısı
+
+![Yük altında ve toparlanmış gerilim](graphs/discharge_overlay-light.png#gh-light-mode-only)
+![Yük altında ve toparlanmış gerilim](graphs/discharge_overlay-dark.png#gh-dark-mode-only)
+
+Yukarıdakinin yük yönündeki eşi: aynı düzen, aynı eksen, ters yön. Bu kez
+toparlanmış değer yük altındakinin **üstünde** kalıyor. Alt panelde fark şarj
+yönünün tersine davranıyor — boşaldıkça **büyüyor** (−46 → −80 mV), çünkü iç
+direnç alt uca doğru artıyor (aşağıda 2,23 kat olarak ölçüldü).
+
+Kesikli çizgi firmware'in boş kabulü (3,00 V); koşu yük altında 2994,6 mV'ta bitti.
+Şarj grafiğindeki 4,20 V tavanının karşılığı.
+
+> **İki yön neden ayrı grafik:** eşik ekseninde anahtarlama zaten ölçülen terminal
+> geriliminde tetikleniyor, dolayısıyla ortak eşiklerde `charging_mv` ile `loaded_mv`
+> 3–20 mV içinde çakışıyor. Üst üste konsa iki eğri birbirini örter ve hiçbir şey
+> göstermez. Üçünü birlikte görmek için yukarıdaki
+> [üç durum grafiği](#üç-durum-üst-üste) var — onun ekseni dinlenmiş gerilim.
+
 ## Ölçüm düzeneği
 
 | Parça | Rol |
@@ -344,9 +363,9 @@ python scripts/plot_voltage.py
 Şu dosyalar yeniden yazılır:
 
 ```
-graphs/voltage_overlay-light.png    graphs/state_overlay-light.png
-graphs/voltage_overlay-dark.png     graphs/state_overlay-dark.png
-graphs/voltage_overlay.svg          graphs/state_overlay.svg
+graphs/voltage_overlay-light.png    graphs/discharge_overlay-light.png    graphs/state_overlay-light.png
+graphs/voltage_overlay-dark.png     graphs/discharge_overlay-dark.png     graphs/state_overlay-dark.png
+graphs/voltage_overlay.svg          graphs/discharge_overlay.svg          graphs/state_overlay.svg
 data/lookup.csv                     data/lookup-discharge.csv
 ```
 
