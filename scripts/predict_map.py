@@ -1,4 +1,4 @@
-"""Uc durumun tam %0-100 araligi icin birlesik mapping tablosu uretir.
+"""Uc durum icin birlesik mapping tablosu uretir (%0-100 izgarasinda).
 
 ONEMLI: bu script OLCUM URETMEZ. Olculen araligin disini doldurur ve her
 hucreyi kaynagina gore isaretler:
@@ -115,7 +115,7 @@ def delta_from_rho(rho_value: float, ocv: float, charging: bool) -> float:
 class Estimator:
     """Verilen dinlenmis gerilimde uc durumu ve her birinin kaynagini verir.
 
-    soc_curve.py da bunu kullanir: iki script de dogrudan olcumden hesaplar,
+    window_curve.py da bunu kullanir: iki script de dogrudan olcumden hesaplar,
     yani birinin ciktisini digerine 12 mV'lik izgarayla aktarmaktan dogan
     sinir kopmasi olmaz.
     """

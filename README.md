@@ -13,24 +13,34 @@ Amacı basit: karakteristiği bilinmeyen bir bataryada okuduğun terminal gerili
 direnç ve polarizasyon yüzünden akımın yönüne göre kayar. Bu depo o kaymayı tek bir
 hücre için her iki yönde ölçülmüş sayılarla verir.
 
-## Gerçek şarj durumuna göre — bataryanın kendi eğrisi
+## Kapasite eksenine göre — bataryanın kendi eğrisi
 
-Bu, batarya veri sayfalarında gördüğün forma karşılık gelen grafik: x ekseni **gerçek
-şarj durumu (SoC)**, üç eğri üst üste.
+Batarya veri sayfalarında gördüğün forma karşılık gelen grafik: x ekseni gerilim
+yerine **kapasite**, üç eğri üst üste.
 
-![Üç durum, gerçek şarj durumuna göre](graphs/soc_curve-light.png#gh-light-mode-only)
-![Üç durum, gerçek şarj durumuna göre](graphs/soc_curve-dark.png#gh-dark-mode-only)
+![Üç durum, kapasite penceresinde](graphs/window_curve-light.png#gh-light-mode-only)
+![Üç durum, kapasite penceresinde](graphs/window_curve-dark.png#gh-dark-mode-only)
 
 Karakteristik şekil burada ortaya çıkıyor: **ilk %10'da 359 mV'lik dik diz**, sonra
 %10–100 arasında 454 mV'lik uzun ve yumuşak eğim.
 
+> ### ⚠ Bu eksen mutlak şarj durumu DEĞİL
+>
+> `window_pct`, **deşarj koşusunun kendi penceresidir**: %100 koşunun başı (dinlenmiş
+> 3887 mV), %0 koşunun sonu (yük altında 2995 mV). Koşu **dolu hücreden başlamadı** —
+> hücre şarjda dinlenmiş 4089 mV'a kadar çıkmıştı.
+>
+> Aşağıda hesaplandığı gibi bu pencere hücrenin yalnızca **%36–53'ü**. Yani pencereyi
+> "%0–100 SoC" diye sunmak ekseni **1,9–2,8 kat gerdirir** ve alt uçtaki dizi olduğundan
+> geniş gösterir. Bu yüzden sütunun adı `soc_pct` değil `window_pct`.
+
 > **Aşağıdaki diğer grafiklerin ekseni bundan farklı.** Onlarda x, gerilimin
 > *doğrusal indeksi* — yani dinlenmiş eğri tanım gereği düz bir köşegen çıkıyor ve
 > bataryanın plato/diz şekli hiç görünmüyor. O eksen "şu gerilimi okuyorsam ne
-> görürüm" sorusu için doğru; eğrinin **şeklini** görmek için gerçek SoC gerekir.
+> görürüm" sorusu için doğru; eğrinin **şeklini** görmek için kapasite ekseni gerekir.
 > Karşılaştırma tablodaki son sütunda.
 
-| SoC % | Dinlenmiş | Şarjda | Deşarj (yük altında) | Gerilim indeksi |
+| Pencere % | Dinlenmiş | Şarjda | Deşarj (yük altında) | Gerilim indeksi |
 |---:|---:|---:|---:|---:|
 | 0 | 3074,2 | 3274,2 K | 2994,6 Ö | %6,2 |
 | 10 | 3432,9 | 3574,4 Ö | 3370,0 Ö | %36,1 |
@@ -47,9 +57,9 @@ Karakteristik şekil burada ortaya çıkıyor: **ilk %10'da 359 mV'lik dik diz**
 Gerilimler mV. **Ö** ölçüm, **K** köprü, **E** ekstrapolasyon (aşağıda açıklanıyor).
 Bu eksende neredeyse her şey ölçüm: şarj sütunu 97 ölçüm + 4 köprü, yük sütunu
 100 ölçüm + 1 ekstrapolasyon. %1 adımlı hâli
-[`data/soc-curve.csv`](data/soc-curve.csv).
+[`data/window-curve.csv`](data/window-curve.csv).
 
-### SoC nasıl çıkarıldı
+### Kapasite ekseni nasıl çıkarıldı
 
 Yalnızca **deşarj koşusundan**, coulomb sayımıyla:
 
@@ -61,8 +71,8 @@ Yalnızca **deşarj koşusundan**, coulomb sayımıyla:
 
 Şarj koşusu bu eksene **katılmadı**: sabit gerilim aşamasında akım bilinmiyor,
 `Q ∝ t` orada geçersiz (son üç eşik 6770 saniye sürdü, akım düştüğü için). Şarj
-koşusunun gerilimleri dinlenmiş gerilim üzerinden bu eksene taşındı — dinlenmiş→SoC
-ilişkisi hücrenin özelliği, akımın yönünden bağımsız.
+koşusunun gerilimleri dinlenmiş gerilim üzerinden bu eksene taşındı —
+dinlenmiş→kapasite ilişkisi hücrenin özelliği, akımın yönünden bağımsız.
 
 **Çapraz kontrol.** Örtüşen dinlenmiş bandında (3261–3834 mV) iki koşunun gördüğü
 kapasite karşılaştırıldı: şarj koşusu `I ≈ sapma/R_iç` üzerinden, deşarj koşusu
@@ -70,30 +80,53 @@ doğrudan integralden. `R_load` iki tarafta da sadeleşiyor. Sonuç **%17 içind
 uyuşuyor** — coulomb verimi, ρ saçılması ve alt uçtaki oturmamış dinlenme değerleri
 düşünülürse beklenen büyüklükte.
 
-### Bu eksenin iki ucu da mutlak değil
+### Pencere hücrenin ne kadarı — %36–53
 
-1. **%0 mutlak boş değil.** Hücre sağlığı için 2,5 V altına inilmiyor; koşu dinlenmiş
-   3074 mV'ta (yük altında 2995 mV) durdu. Yani %0 **operasyonel tabandır**, hücrenin
-   gerçek boşu değil. Referans eğrilerde üç çizginin altta birleştiği bölge bu yüzden
-   bu veride hiç yok — o birleşme 2,0–2,5 V civarında oluyor ve oraya bilinçli olarak
-   gidilmedi.
-2. **%100 hücrenin dolusu değil.** Deşarj koşusu dinlenmiş 3887 mV'tan başladı, ama
-   hücre şarjda dinlenmiş 4089 mV'a kadar çıktı. Aradaki kapasite bu eksende yok.
+Eksik olan **üst** taraf. Deşarj koşusu dinlenmiş 3887 mV'tan başladı; hücre şarjda
+dinlenmiş 4089 mV'a kadar çıkmıştı. Aradaki kapasite bu eksende yok.
 
-**Üstte birleşme görünüyor, altta görünmüyor** — ikisinin sebebi farklı. Üstte şarj
-sabit gerilime geçip akım düştüğü için şarj sapması gerçekten kapanıyor (140 → 51 → 0
-mV); bu ölçülmüş bir birleşme. Altta ise birleşme *ölçülmedi*, çünkü oraya inilmedi.
+Ne kadar eksik olduğunu sınırlayabiliyoruz. Şarj koşusu o üst bandı **6143 saniyede**
+geçti; o sürede akım bilinmiyor ama sabit gerilim aşamasında akım yalnızca **düşer**,
+yani iki taraflı sınır kurulabilir:
 
-Bu eksen mutlak olsun istiyorsan gereken tek ölçüm: **dolu hücreden başlayan tek bir
-deşarj koşusu** (şarj bitince dummy load'u hemen bağla). Bir de yükün direncini bir
+| Varsayım | Üst bandın kapasitesi | Pencere hücrenin |
+|---|---|---|
+| Tüm süre CC akımıyla aksa (üst sınır) | 53,2 M | **%36'sı** |
+| Tüm süre son (en küçük) akımla aksa (alt sınır) | 26,2 M | **%53'ü** |
+
+Birim `mV·s / R_load`; `R_load` her iki tarafta sadeleşiyor. Akımlar
+`I ≈ 1000 × sapma / ρ` ile yazıldı. Hesap `scripts/window_curve.py` içinde
+(`window_share_bounds`), yani üretilebilir.
+
+Sonuç: **pencere hücrenin kabaca yarısı.** O yüzden bu ekseni 0–100 SoC diye
+etiketlemek yanlış olur.
+
+### Alt uç ise eksik değil
+
+Koşu yük altında **2994,6 mV**'ta bitti. Bu hücrenin belirtilen boşu — firmware'in
+kendi ölçeği de `EMPTY_MV = 3000` kullanıyor. Yani alt uçta ölçüm **tamamlandı**,
+kesilmedi.
+
+Referans eğrilerde üç çizginin 2,0–2,4 V civarında birleştiğini görüyorsan, o grafik
+**LiFePO4** (3,2 V nominal) bir hücreye ait: onun deşarj kesme gerilimi 2,5 V
+civarındadır. Bu hücre **Li-Po / LiCoO2** (3,7 V nominal) ve kesme gerilimi
+**3,0 V**'tur — 2,4 V'a inmek onu kalıcı olarak bozar. Dolayısıyla o birleşme bu
+hücrede zaten 2,4 V'ta değil, 3,0 V'un hemen altında ve grafiğin sol kenarında
+başlıyor.
+
+**Üstte birleşme görünüyor** çünkü şarj sabit gerilime geçip akım düşünce şarj sapması
+gerçekten kapanıyor (140 → 113 → 82 → 51 mV) — bu ölçülmüş.
+
+Ekseni mutlak yapmak için gereken tek ölçüm: **dolu hücreden başlayan bir deşarj
+koşusu** (şarj bitince dummy load'u hemen bağla). Yükün direncini de bir
 multimetreyle okuyup kaydet — o zaman mAh cinsinden mutlak kapasite de çıkar.
 
 ### Referans eğrilerle kıyaslarken
 
-Yaygın SoC grafikleri **LiFePO4** (3,2 V nominal) hücrelere ait ve ortası çok daha
-düzdür — %10–90 arası neredeyse yatay. Bu hücre **Li-Po / LiCoO2** (3,7 V nominal);
-kimyası gereği ortası yatay değil, düzenli yükselen bir eğim. Dik alt diz ve üstteki
-yumuşama ortak, platonun düzlüğü ortak değil. Şekli karşılaştırırken bunu hesaba kat.
+Yaygın SoC grafiklerinin çoğu **LiFePO4** hücrelere ait ve ortası çok daha düzdür —
+%10–90 arası neredeyse yatay. Bu hücrenin kimyası gereği ortası yatay değil, düzenli
+yükselen bir eğim. Dik alt diz ve üstteki yumuşama ortak, platonun düzlüğü ortak
+değil. Şekli karşılaştırırken bunu hesaba kat.
 
 ## Üç durum üst üste
 
@@ -349,9 +382,9 @@ Başlangıç (şarj hiç açılmadan, dinlenmiş): **3255,2 mV**.
 | [`data/raw_dump-discharge.log`](data/raw_dump-discharge.log) | Deşarj koşusunun ham seri port çıktısı |
 | [`data/lookup-discharge.csv`](data/lookup-discharge.csv) | 10 mV adımlı arama tablosu — yük altındaki gerilimden dinlenmiş karşılığı |
 | [`data/lookup-combined.csv`](data/lookup-combined.csv) | **Ölçüm + tahmin** — %0–100 tamamı, üç durum, kaynak sütunlarıyla |
-| [`data/soc-curve.csv`](data/soc-curve.csv) | Gerçek SoC eksenli tablo — coulomb sayımından |
+| [`data/window-curve.csv`](data/window-curve.csv) | Kapasite eksenli tablo (coulomb sayımı) — **mutlak SoC değil** |
 | [`scripts/predict_map.py`](scripts/predict_map.py) | Birleşik tabloyu üretir (**tahmin yapan tek script**) |
-| [`scripts/soc_curve.py`](scripts/soc_curve.py) | SoC eksenini coulomb sayımıyla çıkarır |
+| [`scripts/window_curve.py`](scripts/window_curve.py) | Kapasite eksenini coulomb sayımıyla çıkarır |
 | [`scripts/plot_voltage.py`](scripts/plot_voltage.py) | Grafikleri ve arama tablolarını üretir |
 
 Deşarj koşusunun CSV kolonları şarj koşusundan farklı adlandırılır: `load_elapsed_ms`,
@@ -555,12 +588,13 @@ Sayıların fiziksel olarak anlamlı olup olmadığını birkaç bağımsız yol
 4. **%100 eşiğine hiç ulaşılamadı.** Şarj IC'si 4,20 V'ta sabitlerken ölçülen gerilim
    4140 mV'ta takıldı; deney son satırdan sonra 2 saat daha bekleyip
    `CHARGE_STAGE_TIMEOUT` ile bitti. Haritanın üst ucu bu yüzden 4140 mV'ta kesiliyor.
-5. **İki farklı yüzde var, karıştırma.** `voltage_pct` (ölçüm dosyalarında,
-   `lookup*.csv`'de ve `threshold_pct` olarak) doğrusal bir **gerilim indeksidir**:
-   `100 × (V − 3,000) / (4,200 − 3,000)`. Doluluk değildir. `soc_pct` ise
-   ([`soc-curve.csv`](data/soc-curve.csv)) coulomb sayımından çıkan **gerçek şarj
-   durumudur** — ama iki ucu da mutlak değil (yukarıda anlatıldı). Aradaki fark
-   küçük değil: gerilim indeksi %36 olan nokta gerçekte SoC %10'dur.
+5. **İki farklı yüzde var, ikisi de mutlak SoC değil.** `voltage_pct` (ölçüm
+   dosyalarında, `lookup*.csv`'de ve `threshold_pct` olarak) doğrusal bir **gerilim
+   indeksidir**: `100 × (V − 3,000) / (4,200 − 3,000)`. Kapasiteyle ilgisi yok.
+   `window_pct` ise ([`window-curve.csv`](data/window-curve.csv)) coulomb sayımından
+   çıkan **kapasite** eksenidir, ama **deşarj koşusunun penceresine göredir** —
+   o pencere hücrenin %36–53'ü. Aradaki fark küçük değil: gerilim indeksi %36 olan
+   nokta pencerenin %10'udur. **Hiçbiri "hücrenin %X'i dolu" demek değildir.**
 6. **Tek hücre, tek koşu.** Oda sıcaklığında, ~0,5C şarjla alınmış tek bir ölçüm
    serisidir. Sıcaklık, şarj akımı ve hücre yaşı bu eğriyi kaydırır.
 7. **Yük altındaki davranış artık ölçüldü** — ama tek bir yük akımında. Aynı anahtara
@@ -577,13 +611,13 @@ python -m venv .venv
 .venv/Scripts/activate      # Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
 python scripts/predict_map.py      # birlesik tablo
-python scripts/soc_curve.py        # SoC ekseni
+python scripts/window_curve.py        # kapasite ekseni
 python scripts/plot_voltage.py     # grafikler (yukaridaki iki tabloya bagli)
 ```
 
 İlk ikisi birbirinden bağımsız — ikisi de doğrudan ölçüm dosyalarını okur ve tahmin
 çekirdeğini (`predict_map.Estimator`) paylaşır. `plot_voltage.py` en son çalışır;
-tam aralık ve SoC grafiklerini o iki tablodan çizer, eksik olanı atlayıp uyarı basar.
+tam aralık ve kapasite grafiklerini o iki tablodan çizer, eksik olanı atlayıp uyarı basar.
 
 Şu dosyalar yeniden yazılır:
 
@@ -591,9 +625,9 @@ tam aralık ve SoC grafiklerini o iki tablodan çizer, eksik olanı atlayıp uya
 graphs/voltage_overlay-light.png    graphs/state_overlay-light.png    graphs/full_range-light.png
 graphs/voltage_overlay-dark.png     graphs/state_overlay-dark.png     graphs/full_range-dark.png
 graphs/voltage_overlay.svg          graphs/state_overlay.svg          graphs/full_range.svg
-graphs/soc_curve-light.png          graphs/soc_curve-dark.png         graphs/soc_curve.svg
+graphs/window_curve-light.png          graphs/window_curve-dark.png         graphs/window_curve.svg
 data/lookup.csv                     data/lookup-discharge.csv         data/lookup-combined.csv
-data/soc-curve.csv
+data/window-curve.csv
 ```
 
 Grafikler `data/measurements.csv` (şarj) ve `data/measurements-discharge.csv` (yük)

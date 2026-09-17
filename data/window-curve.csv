@@ -1,4 +1,4 @@
-soc_pct,rested_mv,charging_mv,loaded_mv,charging_src,loaded_src
+window_pct,rested_mv,charging_mv,loaded_mv,charging_src,loaded_src
 0,3074.2,3274.2,2994.6,bridged,measured
 1,3137.4,3328.2,3061.2,bridged,measured
 2,3190.9,3370.9,3118.5,bridged,measured
