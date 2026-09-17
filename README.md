@@ -20,6 +20,12 @@ hücre için her iki yönde ölçülmüş sayılarla verir.
 
 Ortak eksen **dinlenmiş (açık devre) gerilim** — bataryanın gerçek durumu. Şarj eğrisi
 referansın üstünde, yük eğrisi altında kalır; iki taralı bant sapmanın kendisidir.
+İşaretçiler ölçülen çiftlerde: şarj yönünde 13, yük yönünde 15 nokta.
+
+> **Soluk turuncu çizgi veri değil.** Bu eksende x zaten dinlenmiş gerilim olduğu için
+> o çizgi tanım gereği `y = x`'tir — ölçülmüş bir eğri değil, eksenin kendisi. O yüzden
+> ince/soluk çizilir ve legend'de seri olarak yer almaz. Ölçüm bilgisi mavi ve yeşil
+> eğrilerde: onların bu çizgiden dikey uzaklığı sapmanın kendisi.
 
 > **Eksen neden terminal gerilimi değil:** her iki koşuda da anahtarlama zaten ölçülen
 > terminal geriliminde tetikleniyor. Terminal gerilimine göre çizilirse `charging_mv` ile

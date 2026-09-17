@@ -260,9 +260,9 @@ def render_states(
     ax.fill_between(ld_x, ld_y, ld_x, color=t["load"], alpha=0.10,
                     linewidth=0, zorder=1)
 
-    # Referans cizgisi markersiz: noktalari diger iki serinin x'leriyle ayni.
-    ax.plot(ref_x, ref_x, color=t["rested"], linewidth=2, zorder=3,
-            label="Dinlenmiş (açık devre) — referans")
+    # Referans: bu eksende x zaten dinlenmis gerilim, yani bu cizgi tanim
+    # geregi y=x. Olculmus bir egri DEGIL -> ince, soluk, legend'e girmez.
+    ax.plot(ref_x, ref_x, color=t["rested"], linewidth=1, alpha=0.55, zorder=2)
     ax.plot(ch_x, ch_y, color=t["charging"], linewidth=2, marker="o",
             markersize=8, markeredgecolor=t["surface"], markeredgewidth=2,
             label="Şarj olurken (0,5C)", zorder=4)
@@ -270,15 +270,18 @@ def render_states(
             markersize=8, markeredgecolor=t["surface"], markeredgewidth=2,
             label="Yük altında deşarj olurken", zorder=4)
 
-    # Seri adlari dogrudan cizgi ucunda; metin murekkep renginde kalir.
+    # Olculen serilerin adlari dogrudan cizgi ucunda, murekkep renginde.
     for label, x, y, dy, va in (
         ("Şarj olurken", ch_x[-1], ch_y[-1], 3, "bottom"),
-        ("Dinlenmiş", ref_x[-1], ref_x[-1], -9, "top"),
         ("Yük altında", ld_x[-1], ld_y[-1], 0, "center"),
     ):
         ax.annotate(label, xy=(x, y), xytext=(9, dy), textcoords="offset points",
                     color=t["text"], fontsize=11, fontweight="bold",
                     va=va, ha="left")
+    # Referans ayri tutulur: soluk ve kalin degil, cunku olcum degil.
+    ax.annotate("dinlenmiş = eksen\n(veri değil)", xy=(ref_x[-1], ref_x[-1]),
+                xytext=(9, -9), textcoords="offset points", color=t["muted"],
+                fontsize=9.5, va="top", ha="left")
 
     ax.set_title(
         "Power-Xtra PX103049 — aynı hücre, üç durum: şarjda, dinlenmiş, yük altında",
@@ -293,7 +296,7 @@ def render_states(
         text.set_color(t["text"])
 
     # --- Alt panel: referanstan sapma ---------------------------------------
-    ax_delta.axhline(0, color=t["rested"], linewidth=2, zorder=3)
+    ax_delta.axhline(0, color=t["rested"], linewidth=1, alpha=0.55, zorder=2)
     ax_delta.plot(ch_x, [r["delta_mv"] for r in charge], color=t["charging"],
                   linewidth=2, marker="o", markersize=7,
                   markeredgecolor=t["surface"], markeredgewidth=2, zorder=4)
