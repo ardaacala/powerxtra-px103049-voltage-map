@@ -279,18 +279,29 @@ Toplam yük altında geçen süre: **2 sa 17 dk**, koşunun tamamı 2 sa 33 dk.
   `loaded < recovered`, `threshold_pct` ölçülen gerilimle birebir uyuşuyor, dinlenme
   süresi her satırda 61000 ms ve 30 gerilim değerinin tamamı ADC'nin 0,0625 mV
   (= 2/32) ızgarasına oturuyor.
-- **İki yön birbiriyle uyumlu.** Sonradan **ölçülen** iç direnç 234 mΩ (aşağıya bak).
-  Bu değer üst uçta geçerli olduğuna göre yukarıdaki orandan bu koşunun dummy load'u
-  ≈ 19,6 Ω ve yük akımı ≈ 196 mA (≈0,25C) çıkar. Şarj akımının (~420 mA) kabaca
-  yarısı — sapmaların da o oranda olmasıyla (140 mV'a karşı 46–80 mV) tutarlı.
-  *Bu koşuda yükün direnci ölçülüp kaydedilmedi; sayı iç dirençten çıkarımdır.*
+- **Bu koşunun yük akımı sonradan belirlendi.** Üçüncü kartta dummy load
+  multimetreyle 12,2 Ω olarak ölçüldü ve **aynı eşikte** (%70) yeni bir çift alındı.
+  Aynı hücre, aynı eşik, dolayısıyla aynı iç direnç — sapma oranı doğrudan akım
+  oranıdır ve iç direnç sadeleşir:
+
+  ```
+  sapma_eski / sapma_yeni = 45,75 / 100,50 = 0,455
+  I_yeni = 3839,12 mV / 12,2 Ω           = 315 mA
+  I_eski = 315 mA × 0,455                = 143 mA   (≈0,18C)
+  R_load(eski) = 3837,25 mV / 143 mA     ≈ 26,8 Ω
+  ```
+
+  Şarj akımının (~420 mA) kabaca üçte biri — sapmaların da o oranda olmasıyla
+  (140 mV'a karşı 46–80 mV) tutarlı. Bu çıkarım yalnızca 12,2 Ω'a dayanır; bir
+  OCV→SoC eğrisi veya kapasite varsayımı kullanmaz.
 
 ### Deşarj koşusunun kendi sınırları
 
-1. **Bu koşuda yükün direnci kaydedilmedi.** Yukarıdaki 196 mA ve 19,6 Ω, sonradan
-   ölçülen iç dirence dayanan çıkarımdır. Direncin *oranı* (2,23×) bu varsayımdan
-   bağımsızdır. Sonraki kartta dummy load 12,2 Ω olarak ölçülüp firmware'e yazıldı,
-   yani yeni koşularda akım doğrudan `loaded_mv / 12,2` ile bilinir.
+1. **Bu koşu sırasında yükün direnci kaydedilmedi.** Yukarıdaki 143 mA ve 26,8 Ω,
+   sonradan ölçülen 12,2 Ω ile aynı eşikte alınan bir çiftten çıkarıldı; yalnızca
+   o dirence dayanır, kapasite varsayımı içermez. Direncin *oranı* (2,23×) bundan
+   da bağımsızdır. Dummy load artık firmware'e yazılı, yani yeni koşularda akım
+   doğrudan `loaded_mv / 12,2` ile biliniyor.
 2. **Dört çift 60 saniyede oturmamıştı.** 50. ile 60. saniye arasındaki değişim
    eşik %55'te 5,88 mV, %20'de 5,13 mV, %15'te 3,07 mV ve %0'da 2,38 mV — 2 mV
    eşiğinin üstünde. Bu satırlardaki **dinlenmiş değerler bir miktar düşük**;
@@ -366,8 +377,9 @@ Sayıların fiziksel olarak anlamlı olup olmadığını birkaç bağımsız yol
    dummy load bağlanarak 15 çift alındı (yukarıdaki
    [deşarj bölümü](#yük-altında-deşarj--15-çift-ölçülmüş)). Sapmanın büyüklüğü akımla
    ölçeklenir, dolayısıyla **farklı bir yükte farklı sayılar** çıkar; bu koşu
-   ~0,25C'lik bir yükü temsil eder. Bu koşuda yükün direnci kaydedilmediği için
-   mutlak akım değeri çıkarımdır (sonraki kartta 12,2 Ω olarak ölçülüp kaydedildi).
+   ~0,18C'lik bir yükü temsil eder. Bu koşu sırasında yükün direnci kaydedilmediği
+   için mutlak akım değeri çıkarımdır; sonradan ölçülen 12,2 Ω ile aynı eşikte
+   alınan bir çift üzerinden belirlendi.
 8. **Kapasite hücre etiketinden.** 800 mAh, hücrenin üzerindeki etiketten okundu;
    ayrı bir deşarj testiyle doğrulanmadı. Bütün C-oranı ifadeleri buna dayanır.
    Deponun önceki sürümleri 1500 mAh yazıyordu; o değer yanlıştı ve ona dayanan
