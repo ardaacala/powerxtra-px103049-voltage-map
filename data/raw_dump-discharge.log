@@ -1,0 +1,34 @@
+=== port acildi 09:26:27 ===
+# STATUS,state=IDLE,on=0,adc_mv=1582.84,battery_mv=3165.69,voltage_pct=13.81,next_pct=5,rest_remaining_s=0,elapsed_s=0,fault=NONE,switch_pin=0,est_rested_mv=,est_pct=,map_points=1
+
+>>> STATUS
+# STATUS,state=IDLE,on=0,adc_mv=1585.25,battery_mv=3170.50,voltage_pct=14.21,next_pct=5,rest_remaining_s=0,elapsed_s=0,fault=NONE,switch_pin=0,est_rested_mv=,est_pct=,map_points=1
+# STATUS,state=IDLE,on=0,adc_mv=1583.78,battery_mv=3167.56,voltage_pct=13.96,next_pct=5,rest_remaining_s=0,elapsed_s=0,fault=NONE,switch_pin=0,est_rested_mv=,est_pct=,map_points=1
+
+>>> AUTO
+# AUTO,ON,saved_pairs=15,next_boot=IDLE
+# STATUS,state=IDLE,on=0,adc_mv=1582.78,battery_mv=3165.56,voltage_pct=13.80,next_pct=5,rest_remaining_s=0,elapsed_s=0,fault=NONE,switch_pin=0,est_rested_mv=,est_pct=,map_points=1
+
+>>> DUMP
+# SAVED,state=DONE,fault=NONE,elapsed_ms=9175006,rows=15
+# CONFIG,empty_mv=3000.00,full_mv=4200.00,divider=2.0000,gain=1.000000,offset_mv=0.00
+# BASELINE,elapsed_ms=0,battery_mv=3887.19,initial_rest_ms=0
+row,first_crossed_pct,threshold_pct,load_elapsed_ms,rest_elapsed_ms,rest_duration_ms,total_load_ms,loaded_mv,recovered_mv,delta_mv,complete,relax_mv
+1,70,70,10006,71006,61000,10006,3837.25,3883.00,-45.75,1,3884.31;3884.62;3885.56;3885.38;3881.75;3883.06;3882.81
+2,65,65,1581006,1642006,61000,1520006,3778.50,3834.62,-56.12,1,3822.69;3826.56;3827.88;3830.31;3831.25;3832.06;3833.69
+3,60,60,2906006,2967006,61000,2784006,3719.12,3774.00,-54.88,1,3762.69;3764.38;3766.31;3766.19;3769.31;3770.56;3772.62
+4,55,55,3724006,3785006,61000,3541006,3659.56,3719.50,-59.94,1,3705.94;3708.00;3710.00;3710.75;3712.00;3713.56;3713.62
+5,50,50,4504006,4565006,61000,4260006,3599.94,3661.69,-61.75,1,3652.44;3653.81;3654.88;3654.94;3656.81;3657.62;3661.12
+6,45,45,5482006,5543006,61000,5177006,3538.88,3595.50,-56.62,1,3582.44;3585.06;3587.12;3588.50;3593.44;3592.56;3595.19
+7,40,40,6585006,6646006,61000,6219006,3478.38,3531.31,-52.94,1,3522.75;3523.75;3525.44;3527.12;3526.38;3530.56;3533.06
+8,35,35,7483006,7544006,61000,7056006,3419.06,3483.69,-64.62,1,3468.25;3470.69;3470.88;3473.75;3477.31;3478.06;3482.56
+9,30,30,7890006,7951006,61000,7402006,3359.12,3421.69,-62.56,1,3408.62;3411.12;3413.50;3413.94;3416.81;3417.81;3419.75
+10,25,25,8179006,8240006,61000,7630006,3298.62,3363.38,-64.75,1,3348.38;3351.19;3353.94;3355.12;3356.69;3361.12;3361.50
+11,20,20,8415006,8476006,61000,7805006,3235.62,3308.44,-72.81,1,3288.44;3292.25;3293.88;3294.50;3297.81;3301.06;3303.31
+12,15,15,8626006,8687006,61000,7955006,3177.88,3244.88,-67.00,1,3230.44;3234.06;3234.75;3235.38;3237.44;3240.44;3241.81
+13,10,10,8805006,8866006,61000,8073006,3114.81,3187.56,-72.75,1,3173.00;3177.12;3178.88;3180.69;3182.31;3184.12;3186.12
+14,5,5,8965006,9026006,61000,8172006,3055.19,3131.88,-76.69,1,3112.31;3117.44;3122.56;3123.12;3127.38;3129.19;3130.12
+15,0,0,9114006,9175006,61000,8260006,2994.62,3074.19,-79.56,1,3051.19;3053.19;3055.56;3059.44;3064.56;3067.38;3071.81
+# STATUS,state=IDLE,on=0,adc_mv=1583.03,battery_mv=3166.06,voltage_pct=13.84,next_pct=5,rest_remaining_s=0,elapsed_s=0,fault=NONE,switch_pin=0,est_rested_mv=,est_pct=,map_points=1
+# STATUS,state=IDLE,on=0,adc_mv=1582.50,battery_mv=3165.00,voltage_pct=13.75,next_pct=5,rest_remaining_s=0,elapsed_s=0,fault=NONE,switch_pin=0,est_rested_mv=,est_pct=,map_points=1
+# STATUS,state=IDLE,on=0,adc_mv=1582.31,battery_mv=3164.62,voltage_pct=13.72,next_pct=5,rest_remaining_s=0,elapsed_s=0,fault=NONE,switch_pin=0,est_rested_mv=,est_pct=,map_points=1
