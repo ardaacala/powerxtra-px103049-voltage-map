@@ -171,7 +171,7 @@ def render(rows: list[dict], theme_name: str, svg: bool = False) -> Path:
                 fontweight="bold", va="top", ha="left")
 
     ax.set_title(
-        "Power-Xtra PX103049 (3,7 V / 1500 mAh Li-Po) — şarj ve dinlenmiş gerilim",
+        "Power-Xtra PX103049 (3,7 V / 800 mAh Li-Po) — şarj ve dinlenmiş gerilim",
         color=t["text"], fontsize=14, fontweight="bold", loc="left", pad=14,
     )
     ax.set_ylabel("Batarya gerilimi (V)", color=t["muted"], fontsize=11)
@@ -268,7 +268,7 @@ def render_discharge(rows: list[dict], theme_name: str, svg: bool = False) -> Pa
                 fontweight="bold", va="top", ha="left")
 
     ax.set_title(
-        "Power-Xtra PX103049 (3,7 V / 1500 mAh Li-Po) — yük altında ve "
+        "Power-Xtra PX103049 (3,7 V / 800 mAh Li-Po) — yük altında ve "
         "toparlanmış gerilim",
         color=t["text"], fontsize=13.5, fontweight="bold", loc="left", pad=14,
     )

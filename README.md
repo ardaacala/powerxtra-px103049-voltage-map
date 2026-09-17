@@ -1,6 +1,6 @@
 # Power-Xtra PX103049 — şarj / dinlenmiş / yük altında gerilim haritası
 
-Power-Xtra **PX103049** (3,7 V nominal, 1500 mAh Li-Po) hücresinde aynı gerilimin
+Power-Xtra **PX103049** (3,7 V nominal, 800 mAh Li-Po) hücresinde aynı gerilimin
 **üç farklı durumda** ne okuduğunun ölçüm verisi:
 
 | Durum | Ne oluyor | Okunan gerilim |
@@ -48,7 +48,7 @@ Ara değerler iki koşunun ölçüm noktaları arasında doğrusal interpolasyon
 örtüşen dinlenmiş aralık 3260,8–3883,0 mV.
 
 Sapma simetrik **değil**: şarj yönünde +51…+166 mV, yük yönünde yalnızca −46…−80 mV.
-Sebebi akım farkı — şarj ~0,5C (≈750 mA) ile yapıldı, yük ise sabit bir dummy load ve
+Sebebi akım farkı — şarj ~0,5C (≈420 mA) ile yapıldı, yük ise sabit bir dummy load ve
 çok daha küçük akım çekiyor. Sapmanın büyüklüğü akımla ölçeklenir, yönüyle değil.
 
 ## Şarj yönü ayrıntısı
@@ -86,7 +86,7 @@ Kesikli çizgi firmware'in boş kabulü (3,00 V); koşu yük altında 2994,6 mV'
 | ESP32-WROOM-32D DevKit | Ölçüm ve anahtar kontrolü |
 | TPS22919 yük anahtarı | Hattı açıp kapatır (GPIO4, HIGH = açık) |
 | 10 kΩ + 10 kΩ gerilim bölücü | Batarya gerilimini ikiye böler, orta nokta ADC girişine |
-| Power-Xtra PX103049 | Ölçülen hücre, 3,7 V / 1500 mAh Li-Po |
+| Power-Xtra PX103049 | Ölçülen hücre, 3,7 V / 800 mAh Li-Po (hücre etiketi) |
 
 Aynı anahtar iki yönde de kullanıldı: **şarj koşularında** şarj hattını, **deşarj
 koşusunda** bir sabit dummy load'u bağlayıp kesiyor. Ölçüm mantığı birebir aynı,
@@ -279,17 +279,18 @@ Toplam yük altında geçen süre: **2 sa 17 dk**, koşunun tamamı 2 sa 33 dk.
   `loaded < recovered`, `threshold_pct` ölçülen gerilimle birebir uyuşuyor, dinlenme
   süresi her satırda 61000 ms ve 30 gerilim değerinin tamamı ADC'nin 0,0625 mV
   (= 2/32) ızgarasına oturuyor.
-- **İki yön birbiriyle uyumlu.** Şarj koşusundan çıkan iç direnç ~187 mΩ. Bu değer üst
-  uçta da geçerliyse yukarıdaki orandan dummy load ≈ 15,7 Ω ve yük akımı ≈ 244 mA
-  (≈0,16C) çıkar. Şarj akımının (~750 mA) kabaca üçte biri — sapmaların da kabaca
-  üçte bir olmasıyla (140 mV'a karşı 46–80 mV) tutarlı. *Bu bir çıkarım; yükün direnci
-  ölçülüp kaydedilmedi.*
+- **İki yön birbiriyle uyumlu.** Sonradan **ölçülen** iç direnç 234 mΩ (aşağıya bak).
+  Bu değer üst uçta geçerli olduğuna göre yukarıdaki orandan bu koşunun dummy load'u
+  ≈ 19,6 Ω ve yük akımı ≈ 196 mA (≈0,25C) çıkar. Şarj akımının (~420 mA) kabaca
+  yarısı — sapmaların da o oranda olmasıyla (140 mV'a karşı 46–80 mV) tutarlı.
+  *Bu koşuda yükün direnci ölçülüp kaydedilmedi; sayı iç dirençten çıkarımdır.*
 
 ### Deşarj koşusunun kendi sınırları
 
-1. **Yükün direnci kaydedilmedi.** Dolayısıyla yük akımı ve iç direnç **mutlak**
-   olarak verilemez; yukarıdaki 244 mA ve 15,7 Ω yalnızca şarj koşusunun iç direncine
-   dayanan bir çıkarımdır. Direncin *oranı* (2,23×) bu varsayımdan bağımsızdır.
+1. **Bu koşuda yükün direnci kaydedilmedi.** Yukarıdaki 196 mA ve 19,6 Ω, sonradan
+   ölçülen iç dirence dayanan çıkarımdır. Direncin *oranı* (2,23×) bu varsayımdan
+   bağımsızdır. Sonraki kartta dummy load 12,2 Ω olarak ölçülüp firmware'e yazıldı,
+   yani yeni koşularda akım doğrudan `loaded_mv / 12,2` ile bilinir.
 2. **Dört çift 60 saniyede oturmamıştı.** 50. ile 60. saniye arasındaki değişim
    eşik %55'te 5,88 mV, %20'de 5,13 mV, %15'te 3,07 mV ve %0'da 2,38 mV — 2 mV
    eşiğinin üstünde. Bu satırlardaki **dinlenmiş değerler bir miktar düşük**;
@@ -309,12 +310,29 @@ Sayıların fiziksel olarak anlamlı olup olmadığını birkaç bağımsız yol
   sabit; CV'ye geçişte 113 → 82 → 51 mV'a düşüyor. Akım azaldıkça IR düşüşünün
   azalması tam olarak olması gereken şey.
 - **İma edilen şarj akımı CC bölgesinde sabit.** Ardışık `rested_mv` değerlerini genel
-  bir Li-Po OCV→SoC eğrisinden geçirip 1500 mAh üzerinden hesaplayınca 6.–10.
-  satırlarda 695 / 959 / 725 / 732 / 838 mA çıkıyor — ortalama ~750 mA (≈0,5C).
-  Sonrasında 420 → 226 → 97 mA ile düzgün bir CV kuyruğu. Beş bağımsız adımdan
+  bir Li-Po OCV→SoC eğrisinden geçirip **800 mAh** üzerinden hesaplayınca 6.–10.
+  satırlarda 371 / 511 / 387 / 390 / 447 mA çıkıyor — ortalama ~420 mA (≈0,5C).
+  Sonrasında 224 → 121 → 52 mA ile düzgün bir CV kuyruğu. Beş bağımsız adımdan
   aynı akımın çıkması verinin gerçekliğinin en güçlü işareti.
-- **İç direnç makul.** 140 mV / 750 mA ≈ 187 mΩ. Bu boyutta bir pouch hücre + TPS22919
-  (~42 mΩ) + kablolama için beklenen aralıkta.
+
+  > Bu akımlar kapasiteden **türetilmiştir**, o yüzden C-oranı kapasiteyle birlikte
+  > ölçeklenmez: 1500 mAh varsayımı ~790 mA veriyordu ve o da ≈0,5C'ydi. Kapasite
+  > düzeltildiğinde değişen şey **mutlak akım**, C-oranı değil.
+- **İç direnç ölçüldü.** Sonraki kartta dummy load bir multimetreyle 12,2 Ω olarak
+  okundu, yani akım artık varsayım değil. Yük altında 3943,81 mV okunurken sapma
+  75,75 mV ölçüldü:
+
+  ```
+  I    = 3943,81 mV / 12,2 Ω = 323 mA   (≈0,40C)
+  R_iç = 75,75 mV / 323 mA   = 234 mΩ   (dinlenmiş ~4,02 V, yani üst uçta)
+  ```
+
+  Bu sayı **kapasiteden bağımsızdır** — 800 mAh mi 1500 mAh mi olduğu onu
+  değiştirmez. Şarj koşusunun CC bölgesinden dolaylı olarak çıkan değer
+  (140 mV / 420 mA ≈ 330 mΩ) bunun ~1,4 katı; iç direnç boşaldıkça arttığı için
+  (aşağıda 2,23 kat) orta SoC'de daha yüksek olması beklenir. İki bağımsız yol
+  uyuşuyor. Bu boyutta bir pouch hücre + TPS22919 (~42 mΩ) + kablolama için de
+  beklenen aralıkta.
 - **İlk satır fizik testini geçiyor.** Yalnızca 6 saniye şarjdan sonra dinlenmiş gerilim
   3260,8 mV — başlangıçtaki 3255,2 mV'un sadece 5,6 mV üstünde. Neredeyse hiç enerji
   girmediği için doğru sonuç.
@@ -348,8 +366,13 @@ Sayıların fiziksel olarak anlamlı olup olmadığını birkaç bağımsız yol
    dummy load bağlanarak 15 çift alındı (yukarıdaki
    [deşarj bölümü](#yük-altında-deşarj--15-çift-ölçülmüş)). Sapmanın büyüklüğü akımla
    ölçeklenir, dolayısıyla **farklı bir yükte farklı sayılar** çıkar; bu koşu
-   ~0,16C'lik bir yükü temsil eder. Yükün direnci kaydedilmediği için mutlak akım
-   değeri de çıkarımdır.
+   ~0,25C'lik bir yükü temsil eder. Bu koşuda yükün direnci kaydedilmediği için
+   mutlak akım değeri çıkarımdır (sonraki kartta 12,2 Ω olarak ölçülüp kaydedildi).
+8. **Kapasite hücre etiketinden.** 800 mAh, hücrenin üzerindeki etiketten okundu;
+   ayrı bir deşarj testiyle doğrulanmadı. Bütün C-oranı ifadeleri buna dayanır.
+   Deponun önceki sürümleri 1500 mAh yazıyordu; o değer yanlıştı ve ona dayanan
+   mutlak akımlar (~790 mA şarj, ~244 mA yük) da yanlıştı. **Ölçülen gerilimler
+   etkilenmedi** — yalnızca kapasiteden türetilen akımlar düzeltildi.
 
 ## Grafikleri yeniden üretmek
 
