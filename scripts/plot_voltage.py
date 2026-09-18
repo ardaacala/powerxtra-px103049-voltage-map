@@ -1,8 +1,8 @@
 """Sarj / dinlenmis / yuk altinda gerilim haritasi grafikleri.
 
 Hangi batarya islenecegi dosyanin basindaki BATTERY blogundan gelir; script'te
-batarya-ozel baska bir yer yoktur. Su an yapilandirilmis olan: PX803035.
-Onceki hucrenin (PX103049) ayari `px103049` branch'inde.
+batarya-ozel baska bir yer yoktur. Su an yapilandirilmis olan: PX103049.
+Diger hucrenin (PX803035) ayari `px803035` branch'inde.
 
 Girdiler (data/ altinda, BATTERY'den):
   BATTERY["charge_csv"]  -> sarj yonundeki olcum ciftleri
@@ -36,53 +36,54 @@ OUT = ROOT / "graphs"
 # Bu blok disinda script'te batarya-ozel hicbir sey yok. Baska bir hucreye
 # gecmek icin yalnizca burasi degisir -- girdi CSV'leri, cikti adlari, gerilim
 # olcegi ve uc durum grafiginin eksenleri. Onceki hucrenin (PX103049) hazir
-# ayari `px103049` branch'inde ayni yerde duruyor.
+# ayari `px803035` branch'inde ayni yerde duruyor.
 #
 # Nasil calistirilacagi ve blogun nasil doldurulacagi README'de:
 # "Kodu calistirmak" ve "Baska bir batarya icin".
 # ===========================================================================
 BATTERY = dict(
-    model="PX803035",
-    nominal="3,7 V / 800 mAh Li-Po",
+    model="PX103049",
+    nominal="3,7 V / 1500 mAh Li-Po",
+    capacity_mah=1500,          # hucre etiketinden; ayri bir desarj testiyle
+                                # dogrulanmadi (README sinir 8).
 
     # Gerilim olcegi -- firmware'deki BatteryConfig.h ile AYNI olmali.
     # voltage_pct bu ikisinden hesaplanir; dogrusal bir indeks, doluluk degil.
     empty_mv=3000.0,
     full_mv=4200.0,
 
-    # Dummy load'un olculen direnci (CONFIG satirindaki load_ohms).
-    # Bilinmiyorsa None -- o zaman yuk akimi da bilinmiyor demektir.
-    load_ohms=12.20,
+    # Bu kosularda dummy load'un direnci kaydedilmedi. Sonradan olculen 12,2
+    # ohm uzerinden ~26,8 ohm / ~143 mA olarak CIKARILDI, yani olcum degil --
+    # o yuzden burada None.
+    load_ohms=None,
 
     # Girdiler: data/ altindaki olcum CSV'leri.
-    charge_csv="measurements-charge-800mah.csv",
-    load_csv="measurements-discharge-800mah.csv",
+    charge_csv="measurements.csv",
+    load_csv="measurements-discharge.csv",
 
     # Ciktilar: data/ altindaki arama tablolari.
-    charge_lookup="lookup-charge-800mah.csv",
-    load_lookup="lookup-discharge-800mah.csv",
+    charge_lookup="lookup.csv",
+    load_lookup="lookup-discharge.csv",
 
-    # Uretilecek grafikler. "state" her batarya icin calisir (uc durum ust uste).
-    # "charge" ve "load" ayrinti grafikleridir; icindeki aciklama metinleri
-    # PX103049'un sayilarina gore yazilmis, o yuzden tasinabilir degil --
-    # baska bir hucrede acmadan once render()/render_discharge() icindeki
-    # annotate() metinlerini o hucreye gore guncelle.
-    graphs=("state",),
-    charge_stem="voltage_overlay-800mah",
-    load_stem="discharge_overlay-800mah",
-    state_stem="state_overlay-800mah",
+    # Bu hucrenin uc grafigi de uretilir. "charge" ve "load" ayrinti
+    # grafiklerinin icindeki aciklama metinleri bu hucrenin sayilarina gore
+    # yazilmistir -- baska bir bataryaya gecerken render()/render_discharge()
+    # icindeki annotate() cagrilarini da guncellemek gerekir.
+    graphs=("charge", "load", "state"),
+    charge_stem="voltage_overlay",
+    load_stem="discharge_overlay",
+    state_stem="state_overlay",
 
     # Uc durum grafiginin ekseni ve metinleri. Sinirlar elle veriliyor ki
     # kaydedilmis grafikler yeniden uretildiginde birebir ayni ciksin.
-    state_label="Şarj olurken",
-    state_footnote=("Tek koşu, iki faz: 16 çift yük yönünde (12,2 Ω, 245–316 mA), "
-                    "15 çift şarj yönünde. 60 s dinlenme; ADC kalibre edilmedi."),
-    state_xlim=(3.06, 4.13),
-    state_ylim=(2.95, 4.26),
-    state_delta_ylim=(-170, 300),
-    state_note_x=3.46,
+    state_label="Şarj olurken (0,5C)",
+    state_footnote=("Şarj: 13 çift, ~0,5C (koşu 1). Yük: 15 çift, sabit dummy load. "
+                    "Her iki yönde de 60 s dinlenme; ADC kalibre edilmedi."),
+    state_xlim=(3.03, 4.13),
+    state_ylim=(2.95, 4.20),
+    state_delta_ylim=(-130, 210),
+    state_note_x=3.42,
 )
-
 DATA = ROOT / "data" / BATTERY["charge_csv"]
 DATA_DISCHARGE = ROOT / "data" / BATTERY["load_csv"]
 EMPTY_MV = BATTERY["empty_mv"]
