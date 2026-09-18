@@ -1,15 +1,17 @@
-"""Power-Xtra PX103049 sarj / dinlenmis / yuk altinda gerilim haritasi grafikleri.
+"""Sarj / dinlenmis / yuk altinda gerilim haritasi grafikleri.
 
-Girdiler:
-  data/measurements.csv            -> sarj kosusu (13 cift, sarj yonu)
-  data/measurements-discharge.csv  -> desarj kosusu (15 cift, yuk yonu)
+Hangi batarya islenecegi dosyanin basindaki BATTERY blogundan gelir; script'te
+batarya-ozel baska bir yer yoktur. Su an yapilandirilmis olan: PX803035.
+Onceki hucrenin (PX103049) ayari `px103049` branch'inde.
+
+Girdiler (data/ altinda, BATTERY'den):
+  BATTERY["charge_csv"]  -> sarj yonundeki olcum ciftleri
+  BATTERY["load_csv"]    -> yuk yonundeki olcum ciftleri
 
 Ciktilar:
-  graphs/voltage_overlay-light.png / -dark.png / .svg   -> sarj + dinlenmis
-  graphs/discharge_overlay-light.png / -dark.png / .svg -> yuk + toparlanmis
-  graphs/state_overlay-light.png / -dark.png / .svg     -> uc durum ust uste
-  data/lookup.csv                                     -> sarjdaki gerilim -> dinlenmis
-  data/lookup-discharge.csv                           -> yuk altindaki gerilim -> dinlenmis
+  graphs/<state_stem>-light.png / -dark.png / .svg  -> uc durum ust uste
+  graphs/<charge_stem>-*  /  <load_stem>-*          -> yalnizca graphs= acikken
+  data/<charge_lookup>, data/<load_lookup>          -> 10 mV adimli arama tablolari
 
 Kullanim:  python scripts/plot_voltage.py
 """
@@ -26,13 +28,65 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA = ROOT / "data" / "measurements.csv"
-DATA_DISCHARGE = ROOT / "data" / "measurements-discharge.csv"
 OUT = ROOT / "graphs"
 
-# Bu deneyin gerilim olcegi (firmware'deki BatteryConfig.h ile ayni).
-EMPTY_MV = 3000.0
-FULL_MV = 4200.0
+# ===========================================================================
+# OLCULEN BATARYA
+#
+# Bu blok disinda script'te batarya-ozel hicbir sey yok. Baska bir hucreye
+# gecmek icin yalnizca burasi degisir -- girdi CSV'leri, cikti adlari, gerilim
+# olcegi ve uc durum grafiginin eksenleri. Onceki hucrenin (PX103049) hazir
+# ayari `px103049` branch'inde ayni yerde duruyor.
+#
+# Nasil calistirilacagi ve blogun nasil doldurulacagi README'de:
+# "Kodu calistirmak" ve "Baska bir batarya icin".
+# ===========================================================================
+BATTERY = dict(
+    model="PX803035",
+    nominal="3,7 V / 800 mAh Li-Po",
+
+    # Gerilim olcegi -- firmware'deki BatteryConfig.h ile AYNI olmali.
+    # voltage_pct bu ikisinden hesaplanir; dogrusal bir indeks, doluluk degil.
+    empty_mv=3000.0,
+    full_mv=4200.0,
+
+    # Dummy load'un olculen direnci (CONFIG satirindaki load_ohms).
+    # Bilinmiyorsa None -- o zaman yuk akimi da bilinmiyor demektir.
+    load_ohms=12.20,
+
+    # Girdiler: data/ altindaki olcum CSV'leri.
+    charge_csv="measurements-charge-800mah.csv",
+    load_csv="measurements-discharge-800mah.csv",
+
+    # Ciktilar: data/ altindaki arama tablolari.
+    charge_lookup="lookup-charge-800mah.csv",
+    load_lookup="lookup-discharge-800mah.csv",
+
+    # Uretilecek grafikler. "state" her batarya icin calisir (uc durum ust uste).
+    # "charge" ve "load" ayrinti grafikleridir; icindeki aciklama metinleri
+    # PX103049'un sayilarina gore yazilmis, o yuzden tasinabilir degil --
+    # baska bir hucrede acmadan once render()/render_discharge() icindeki
+    # annotate() metinlerini o hucreye gore guncelle.
+    graphs=("state",),
+    charge_stem="voltage_overlay-800mah",
+    load_stem="discharge_overlay-800mah",
+    state_stem="state_overlay-800mah",
+
+    # Uc durum grafiginin ekseni ve metinleri. Sinirlar elle veriliyor ki
+    # kaydedilmis grafikler yeniden uretildiginde birebir ayni ciksin.
+    state_label="Şarj olurken",
+    state_footnote=("Tek koşu, iki faz: 16 çift yük yönünde (12,2 Ω, 245–316 mA), "
+                    "15 çift şarj yönünde. 60 s dinlenme; ADC kalibre edilmedi."),
+    state_xlim=(3.06, 4.13),
+    state_ylim=(2.95, 4.26),
+    state_delta_ylim=(-170, 300),
+    state_note_x=3.46,
+)
+
+DATA = ROOT / "data" / BATTERY["charge_csv"]
+DATA_DISCHARGE = ROOT / "data" / BATTERY["load_csv"]
+EMPTY_MV = BATTERY["empty_mv"]
+FULL_MV = BATTERY["full_mv"]
 
 # Renkler: dogrulanmis kategorik paletin 1./2./3. yuvasi (mavi / turuncu / aqua).
 # Ucu birlikte her iki modda all-pairs esiklerini gecer (CVD dE 9.2 light,
@@ -52,10 +106,10 @@ THEMES = {
 }
 
 
-def load_rows() -> list[dict]:
+def load_rows(path: Path = DATA) -> list[dict]:
     """Yalnizca tamamlanmis (complete=1) olcum ciftlerini dondurur."""
     rows = []
-    with DATA.open(encoding="utf-8") as handle:
+    with path.open(encoding="utf-8") as handle:
         for raw in csv.DictReader(handle):
             if raw["complete"] != "1" or not raw["rested_mv"]:
                 continue
@@ -70,7 +124,7 @@ def load_rows() -> list[dict]:
     return rows
 
 
-def load_discharge_rows() -> list[dict]:
+def load_discharge_rows(path: Path = DATA_DISCHARGE) -> list[dict]:
     """Desarj kosusunun tamamlanmis ciftleri, dinlenmis gerilime gore artan.
 
     Kolon adlari sarj kosusundan farkli: firmware yuk yonunde olcerken
@@ -78,7 +132,7 @@ def load_discharge_rows() -> list[dict]:
     delta_mv bu kosuda negatif -- yuk altindaki gerilim dinlenmisin altinda.
     """
     rows = []
-    with DATA_DISCHARGE.open(encoding="utf-8") as handle:
+    with path.open(encoding="utf-8") as handle:
         for raw in csv.DictReader(handle):
             if raw["complete"] != "1" or not raw["recovered_mv"]:
                 continue
@@ -171,7 +225,7 @@ def render(rows: list[dict], theme_name: str, svg: bool = False) -> Path:
                 fontweight="bold", va="top", ha="left")
 
     ax.set_title(
-        "Power-Xtra PX103049 (3,7 V / 800 mAh Li-Po) — şarj ve dinlenmiş gerilim",
+        f"Power-Xtra {BATTERY['model']} ({BATTERY['nominal']}) — şarj ve dinlenmiş gerilim",
         color=t["text"], fontsize=14, fontweight="bold", loc="left", pad=14,
     )
     ax.set_ylabel("Batarya gerilimi (V)", color=t["muted"], fontsize=11)
@@ -211,7 +265,8 @@ def render(rows: list[dict], theme_name: str, svg: bool = False) -> Path:
     fig.subplots_adjust(left=0.085, right=0.845, top=0.925, bottom=0.105)
 
     OUT.mkdir(exist_ok=True)
-    name = "voltage_overlay.svg" if svg else f"voltage_overlay-{theme_name}.png"
+    stem = BATTERY["charge_stem"]
+    name = f"{stem}.svg" if svg else f"{stem}-{theme_name}.png"
     path = OUT / name
     fig.savefig(path, dpi=None if svg else 200, facecolor=t["surface"])
     plt.close(fig)
@@ -268,7 +323,7 @@ def render_discharge(rows: list[dict], theme_name: str, svg: bool = False) -> Pa
                 fontweight="bold", va="top", ha="left")
 
     ax.set_title(
-        "Power-Xtra PX103049 (3,7 V / 800 mAh Li-Po) — yük altında ve "
+        f"Power-Xtra {BATTERY['model']} ({BATTERY['nominal']}) — yük altında ve "
         "toparlanmış gerilim",
         color=t["text"], fontsize=13.5, fontweight="bold", loc="left", pad=14,
     )
@@ -307,7 +362,8 @@ def render_discharge(rows: list[dict], theme_name: str, svg: bool = False) -> Pa
     fig.subplots_adjust(left=0.085, right=0.845, top=0.925, bottom=0.105)
 
     OUT.mkdir(exist_ok=True)
-    name = "discharge_overlay.svg" if svg else f"discharge_overlay-{theme_name}.png"
+    stem = BATTERY["load_stem"]
+    name = f"{stem}.svg" if svg else f"{stem}-{theme_name}.png"
     path = OUT / name
     fig.savefig(path, dpi=None if svg else 200, facecolor=t["surface"])
     plt.close(fig)
@@ -315,7 +371,10 @@ def render_discharge(rows: list[dict], theme_name: str, svg: bool = False) -> Pa
 
 
 def render_states(
-    charge: list[dict], discharge: list[dict], theme_name: str, svg: bool = False
+    charge: list[dict], discharge: list[dict], theme_name: str, svg: bool = False,
+    *, stem: str, title: str, charge_label: str, footnote: str,
+    xlim: tuple[float, float], ylim: tuple[float, float],
+    delta_ylim: tuple[float, float], note_x: float,
 ) -> Path:
     """Uc durumu ortak bir eksende ust uste koyar.
 
@@ -362,7 +421,7 @@ def render_states(
     ax.plot(ref_x, ref_x, color=t["rested"], linewidth=1, alpha=0.55, zorder=2)
     ax.plot(ch_x, ch_y, color=t["charging"], linewidth=2, marker="o",
             markersize=8, markeredgecolor=t["surface"], markeredgewidth=2,
-            label="Şarj olurken (0,5C)", zorder=4)
+            label=charge_label, zorder=4)
     ax.plot(ld_x, ld_y, color=t["load"], linewidth=2, marker="o",
             markersize=8, markeredgecolor=t["surface"], markeredgewidth=2,
             label="Yük altında deşarj olurken", zorder=4)
@@ -380,14 +439,12 @@ def render_states(
                 xytext=(9, -9), textcoords="offset points", color=t["muted"],
                 fontsize=9.5, va="top", ha="left")
 
-    ax.set_title(
-        "Power-Xtra PX103049 — aynı hücre, üç durum: şarjda, dinlenmiş, yük altında",
-        color=t["text"], fontsize=14, fontweight="bold", loc="left", pad=14,
-    )
+    ax.set_title(title, color=t["text"], fontsize=14, fontweight="bold",
+                 loc="left", pad=14)
     ax.set_ylabel("Terminal gerilimi (V)", color=t["muted"], fontsize=11)
     ax.yaxis.set_major_locator(MultipleLocator(0.1))
-    ax.set_ylim(2.95, 4.20)
-    ax.set_xlim(3.03, 4.13)
+    ax.set_ylim(*ylim)
+    ax.set_xlim(*xlim)
     legend = ax.legend(loc="upper left", frameon=False, fontsize=10.5)
     for text in legend.get_texts():
         text.set_color(t["text"])
@@ -407,26 +464,23 @@ def render_states(
     )
     ax_delta.xaxis.set_major_locator(MultipleLocator(0.1))
     ax_delta.yaxis.set_major_locator(MultipleLocator(50))
-    ax_delta.set_ylim(-130, 210)
+    ax_delta.set_ylim(*delta_ylim)
 
     # Aciklamalar egrilerin bos tarafinda: sarj serisinin ustu, yukun alti.
     ch_d = [r["delta_mv"] for r in charge]
     ld_d = [r["delta_mv"] for r in discharge]
     ax_delta.annotate(f"şarj yönü: +{min(ch_d):.0f} … +{max(ch_d):.0f} mV",
-                      xy=(3.42, 190), color=t["text"], fontsize=10,
+                      xy=(note_x, delta_ylim[1] - 20), color=t["text"], fontsize=10,
                       ha="left", va="center")
     ax_delta.annotate(f"yük yönü: −{abs(max(ld_d)):.0f} … −{abs(min(ld_d)):.0f} mV",
-                      xy=(3.42, -110), color=t["text"], fontsize=10,
+                      xy=(note_x, delta_ylim[0] + 20), color=t["text"], fontsize=10,
                       ha="left", va="center")
 
-    fig.text(0.008, 0.012,
-             "Şarj: 13 çift, ~0,5C (koşu 1). Yük: 15 çift, sabit dummy load. "
-             "Her iki yönde de 60 s dinlenme; ADC kalibre edilmedi.",
-             color=t["muted"], fontsize=9)
+    fig.text(0.008, 0.012, footnote, color=t["muted"], fontsize=9)
     fig.subplots_adjust(left=0.085, right=0.845, top=0.925, bottom=0.105)
 
     OUT.mkdir(exist_ok=True)
-    name = "state_overlay.svg" if svg else f"state_overlay-{theme_name}.png"
+    name = f"{stem}.svg" if svg else f"{stem}-{theme_name}.png"
     path = OUT / name
     fig.savefig(path, dpi=None if svg else 200, facecolor=t["surface"])
     plt.close(fig)
@@ -434,31 +488,49 @@ def render_states(
 
 
 def main() -> None:
-    rows = load_rows()
-    if not rows:
-        raise SystemExit("data/measurements.csv icinde tamamlanmis olcum yok.")
-    written = [
-        render(rows, "light"),
-        render(rows, "dark"),
-        render(rows, "light", svg=True),
-        write_lookup(build_map(rows)),
+    """Yapilandirilmis bataryanin grafiklerini ve arama tablolarini uretir."""
+    charge = load_rows()
+    if not charge:
+        raise SystemExit(f"data/{BATTERY['charge_csv']} icinde tamamlanmis cift yok.")
+    load = load_discharge_rows()
+    if not load:
+        raise SystemExit(f"data/{BATTERY['load_csv']} icinde tamamlanmis cift yok.")
+
+    state_opts = dict(
+        stem=BATTERY["state_stem"],
+        title=(f"Power-Xtra {BATTERY['model']} — aynı hücre, üç durum: "
+               "şarjda, dinlenmiş, yük altında"),
+        charge_label=BATTERY["state_label"],
+        footnote=BATTERY["state_footnote"],
+        xlim=BATTERY["state_xlim"],
+        ylim=BATTERY["state_ylim"],
+        delta_ylim=BATTERY["state_delta_ylim"],
+        note_x=BATTERY["state_note_x"],
+    )
+
+    written: list[Path] = []
+    if "charge" in BATTERY["graphs"]:
+        written += [render(charge, "light"), render(charge, "dark"),
+                    render(charge, "light", svg=True)]
+    if "load" in BATTERY["graphs"]:
+        written += [render_discharge(load, "light"), render_discharge(load, "dark"),
+                    render_discharge(load, "light", svg=True)]
+    if "state" in BATTERY["graphs"]:
+        written += [render_states(charge, load, "light", **state_opts),
+                    render_states(charge, load, "dark", **state_opts),
+                    render_states(charge, load, "light", svg=True, **state_opts)]
+    written += [
+        write_lookup(build_map(charge), name=BATTERY["charge_lookup"]),
+        write_lookup(build_map(load, "loaded_mv"),
+                     name=BATTERY["load_lookup"], first_col="loaded_mv"),
     ]
 
-    discharge = load_discharge_rows()
-    if not discharge:
-        raise SystemExit("data/measurements-discharge.csv icinde tamamlanmis olcum yok.")
-    written += [
-        render_discharge(discharge, "light"),
-        render_discharge(discharge, "dark"),
-        render_discharge(discharge, "light", svg=True),
-        render_states(rows, discharge, "light"),
-        render_states(rows, discharge, "dark"),
-        render_states(rows, discharge, "light", svg=True),
-        write_lookup(build_map(discharge, "loaded_mv"),
-                     name="lookup-discharge.csv", first_col="loaded_mv"),
-    ]
+    print(f"Batarya: Power-Xtra {BATTERY['model']} ({BATTERY['nominal']})")
+    print(f"Girdi:   data/{BATTERY['charge_csv']} ({len(charge)} cift), "
+          f"data/{BATTERY['load_csv']} ({len(load)} cift)")
+    print("Yazilan:")
     for path in written:
-        print(path.relative_to(ROOT))
+        print(f"  {path.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

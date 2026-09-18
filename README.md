@@ -13,6 +13,11 @@ Amacı basit: karakteristiği bilinmeyen bir bataryada okuduğun terminal gerili
 direnç ve polarizasyon yüzünden akımın yönüne göre kayar. Bu depo o kaymayı tek bir
 hücre için her iki yönde ölçülmüş sayılarla verir.
 
+Deponun **çoğu** bu tek PX103049 hücresine ait. Sonradan eklenen ikinci bir hücrenin
+(**PX803035**, yine 800 mAh) verisi `-800mah` ekli dosyalarda ayrı durur;
+[kendi bölümünde](#power-xtra-px803035--ikinci-hücre-800-mah-18-eylül-2026)
+anlatılıyor. İki hücrenin sayıları birleştirilmedi.
+
 ## Üç durum üst üste
 
 ![Şarjda, dinlenmiş ve yük altında gerilim](graphs/state_overlay-light.png#gh-light-mode-only)
@@ -141,7 +146,7 @@ Başlangıç (şarj hiç açılmadan, dinlenmiş): **3255,2 mV**.
 | [`data/measurements-discharge.csv`](data/measurements-discharge.csv) | Deşarj koşusunun 15 ölçüm çifti (yük yönü) |
 | [`data/raw_dump-discharge.log`](data/raw_dump-discharge.log) | Deşarj koşusunun ham seri port çıktısı |
 | [`data/lookup-discharge.csv`](data/lookup-discharge.csv) | 10 mV adımlı arama tablosu — yük altındaki gerilimden dinlenmiş karşılığı |
-| [`scripts/plot_voltage.py`](scripts/plot_voltage.py) | Grafikleri ve arama tablolarını üretir |
+| [`scripts/plot_voltage.py`](scripts/plot_voltage.py) | Grafikleri ve arama tablolarını üretir — bu hücrenin çıktıları için `px103049` branch'i ([nasıl](#kodu-çalıştırmak)) |
 
 Deşarj koşusunun CSV kolonları şarj koşusundan farklı adlandırılır: `load_elapsed_ms`,
 `total_load_ms`, `loaded_mv`, `recovered_mv`. Karşılıkları sırasıyla
@@ -386,24 +391,339 @@ Sayıların fiziksel olarak anlamlı olup olmadığını birkaç bağımsız yol
    mutlak akımlar (~790 mA şarj, ~244 mA yük) da yanlıştı. **Ölçülen gerilimler
    etkilenmedi** — yalnızca kapasiteden türetilen akımlar düzeltildi.
 
-## Grafikleri yeniden üretmek
+## Power-Xtra PX803035 — ikinci hücre, 800 mAh (18 Eylül 2026)
+
+Yukarıdaki bütün ölçümler tek bir **PX103049** hücresine ait. Bu bölüm başka bir
+hücrenin verisi: **PX803035**, kapasitesi yine 800 mAh ama farklı bir model. Dosyaları
+`-800mah` ekiyle ayrı duruyor, yukarıdaki tablolarla ve grafiklerle
+**birleştirilmedi**.
+
+> **İki hücreyi karıştırma.** Aynı eşikteki sayılar doğrudan kıyaslanamaz: hücre
+> farklı, yük akımı farklı (143 mA yerine 245–316 mA) ve şarj akımı da farklı.
+> Aşağıdaki karşılaştırmalar bu yüzden "iki hücre arasındaki fark" değil, "iki
+> koşu arasındaki fark" olarak okunmalı.
+
+Düzenek aynı (ESP32 + TPS22919 + 10 kΩ/10 kΩ bölücü), firmware ise yeni. Değişenler:
+
+| | PX103049 (yukarısı) | PX803035 (bu bölüm) |
+|---|---|---|
+| Koşu yapısı | üç ayrı koşu (şarj, şarj, deşarj) | **tek koşu, iki faz**: önce deşarj, sonra şarj |
+| Yük direnci | koşu sırasında kaydedilmedi, sonradan ölçüldü | firmware'de yazılı, `CONFIG` satırında: **12,20 Ω** |
+| Yük akımı | çıkarım (≈143 mA) | **doğrudan hesaplanıyor**: `loaded_mv / 12,2` |
+| Üst uç | 4140 mV'ta takıldı, `CHARGE_STAGE_TIMEOUT` | **eşik %100 alındı**, 4200,6 mV |
+| Bitiş | biri `FAULT`, biri `DONE` | `state=DONE`, 31 çiftin tamamı |
+| `STATUS` alanları | `switch_pin` | `phase`, `load_pin`, `charge_pin` |
+
+Veri cihazdan 18 Eylül 2026'da `DUMP` ile, aynı şekilde (COM4, 115200 8N1,
+DTR/RTS asserted edilmeden) çekildi: [`data/raw_dump-800mah.log`](data/raw_dump-800mah.log).
+
+### Üç durum üst üste
+
+![PX803035 — şarjda, dinlenmiş ve yük altında gerilim](graphs/state_overlay-800mah-light.png#gh-light-mode-only)
+![PX803035 — şarjda, dinlenmiş ve yük altında gerilim](graphs/state_overlay-800mah-dark.png#gh-dark-mode-only)
+
+Deponun başındaki [üç durum grafiğinin](#üç-durum-üst-üste) bu hücredeki karşılığı,
+aynı eksende ve aynı okumayla: ortak eksen **dinlenmiş (açık devre) gerilim**, mavi
+eğri şarj yönü, yeşil eğri yük yönü, aradaki soluk turuncu çizgi eksenin kendisi
+(`y = x`, ölçüm değil). İşaretçiler ölçülen çiftlerde: şarj yönünde 15, yük yönünde
+16 nokta.
+
+Bu hücrede iki koşu tek bir dumpta olduğu için üç durum aynı hücrenin aynı gününden
+geliyor — PX103049'da şarj ve deşarj ayrı koşulardı.
+
+### Aynı dinlenmiş gerilimde üç durum
+
+Grafiğin sayı hali. İki fazın örtüştüğü dinlenmiş aralık **3180,1–3925,4 mV**; ara
+değerler ölçüm noktaları arasında doğrusal interpolasyonla bulundu.
+
+| Dinlenmiş (OCV) | Şarjda okunur | Yük altında okunur | Pencere |
+|---:|---:|---:|---:|
+| 3200 mV | 3394,8 | 3106,6 | **288,2** |
+| 3250 mV | 3443,0 | 3159,5 | **283,5** |
+| 3300 mV | 3506,0 | 3208,9 | **297,1** |
+| 3350 mV | 3547,8 | 3256,8 | **291,1** |
+| 3400 mV | 3609,5 | 3305,5 | **304,0** |
+| 3450 mV | 3671,0 | 3358,5 | **312,5** |
+| 3500 mV | 3723,3 | 3407,2 | **316,0** |
+| 3550 mV | 3776,9 | 3456,0 | **320,9** |
+| 3600 mV | 3842,8 | 3503,2 | **339,6** |
+| 3650 mV | 3895,3 | 3549,1 | **346,2** |
+| 3700 mV | 3938,4 | 3594,5 | **343,9** |
+| 3750 mV | 3979,9 | 3650,4 | **329,6** |
+| 3800 mV | 4016,2 | 3704,1 | **312,1** |
+| 3850 mV | 4067,5 | 3752,1 | **315,5** |
+| 3900 mV | 4109,1 | 3807,8 | **301,2** |
+
+Pencere **283–346 mV**. PX103049'un 177–222 mV'luk penceresinden geniş, ama bu hücrenin
+daha kötü olduğu anlamına gelmez: **her iki yönde de akım daha yüksek.** Pencerenin
+genişliği akımla ölçeklenir, yönüyle değil.
+
+Ölçülen 31 çiftin kendisi — eşikler, ham gerilimler, süreler ve `relax_mv` ara
+noktaları — CSV'lerde:
+[`measurements-discharge-800mah.csv`](data/measurements-discharge-800mah.csv) (16 çift,
+yük yönü) ve [`measurements-charge-800mah.csv`](data/measurements-charge-800mah.csv)
+(15 çift, şarj yönü).
+
+### Koşunun iki fazı
+
+| | Faz 1 — yük altında deşarj | Faz 2 — şarj |
+|---|---|---|
+| Çift | 16 (eşik %75 → %0) | 15 (eşik %30 → %100) |
+| Başlangıç (dinlenmiş) | **3932,69 mV** | **3131,69 mV** |
+| Bitiş (dinlenmiş) | 3083,9 mV | 4109,4 mV |
+| Akım altında geçen süre | 1 sa 09 dk | 53 dk 49 s |
+| Fazın tamamı | 1 sa 26 dk | 1 sa 09 dk |
+| Sapma aralığı | −69,2 … −105,8 mV | +91,2 … +250,1 mV |
+
+İki faz arasında hücre 3083,9 mV'tan 3131,69 mV'a toparlandı (47,8 mV); şarj fazı bu
+değerden başlıyor.
+
+**Eşik %100 ilk kez alındı.** PX103049 koşusu 4140 mV'ta takılıp zaman aşımıyla
+bitmişti; bu koşu 4200,6 mV'ta %100'ü geçti ve dinlenmiş karşılığı 4109,4 mV çıktı.
+Şarj yönündeki sapma profili beklendiği gibi: %30–90 arasında 192,6–250,1 mV'ta
+gezinip CV aşamasında 158,8 → 91,2 mV'a kapanıyor.
+
+Her iki fazın ilk satırı da fizik testini geçiyor. Yalnızca 6 saniye yükten sonra
+toparlanmış gerilim 3925,4 mV — başlangıçtaki 3932,7 mV'un 7,3 mV altında; neredeyse
+hiç enerji çıkmamış.
+
+### İç direnç: artık çıkarım değil, ölçüm
+
+Yük direnci koşu boyunca biliniyor, dolayısıyla her satırda akım da biliniyor.
+Efektif iç direnç doğrudan çıkıyor:
+
+```
+I     = loaded_mv / 12,2 Ω
+R_eff = |delta_mv| / I
+```
+
+| Eşik % | Toparlanmış (mV) | Akım (mA) | R_eff (mΩ) |
+|---:|---:|---:|---:|
+| 75 | 3925,4 | 316 | 219 |
+| 70 | 3921,2 | 314 | 268 |
+| 65 | 3878,2 | 310 | 323 |
+| 55 | 3754,7 | 300 | 330 |
+| 45 | 3638,4 | 290 | 344 |
+| 35 | 3511,3 | 280 | 332 |
+| 25 | 3388,0 | 270 | 353 |
+| 15 | 3261,1 | 260 | 346 |
+| 5 | 3140,1 | 250 | 368 |
+| 0 | 3083,9 | 245 | 413 |
+
+Boşaldıkça artıyor: 3878 mV'ta 323 mΩ, 3084 mV'ta 413 mΩ — **1,28 kat**. PX103049
+koşusunda aynı eğilim sapma oranından dolaylı olarak 2,23 kat çıkmıştı; bu koşuda
+oran doğrudan ölçülüyor ve daha ılımlı.
+
+> **Bu ohmik direnç değil.** `delta_mv` 60 saniyelik dinlenme sonrasına göre
+> hesaplanıyor, yani IR düşüşü ile difüzyon polarizasyonu birlikte içinde. "60 s'lik
+> efektif DC direnci" demek doğru olur. İlk iki satırın (219 ve 268 mΩ) düşük
+> çıkmasının sebebi de bu: yük o satırlarda yalnızca 6 ve 38 saniyedir bağlıydı,
+> polarizasyon henüz oturmamıştı.
+
+### Deşarjda çekilen yük
+
+Akım her satırda bilindiği için deşarj fazı aynı zamanda bir kulon sayımıdır. Ardışık
+eşikler arasında akımın ortalaması alınıp yük altında geçen süreyle çarpıldı:
+
+| Aralık (dinlenmiş) | Çekilen |
+|---|---:|
+| 3932,7 → 3878,2 mV | 54,5 mAh |
+| 3878,2 → 3703,9 mV | 161,7 mAh |
+| 3703,9 → 3388,0 mV | 107,2 mAh |
+| 3388,0 → 3083,9 mV | 21,3 mAh |
+| **3932,7 → 3083,9 mV** | **345 mAh** |
+
+Ortalama akım 296 mA. Bu sayı yalnızca 12,2 Ω'a dayanır — kapasite varsayımı ya da
+OCV→SoC eğrisi içermez.
+
+> **345 mAh etiket değerinin altında, ama bu bir kapasite ölçümü değil.** Koşu tam bir
+> deşarj testi değildi: 3932,7 mV açık devre geriliminden başladı (hücre dolu değildi)
+> ve 3083,9 mV'ta kesildi (kesme gerilimine kadar boşaltılmadı). Bu pencere tipik bir
+> Li-Po'nun kullanılabilir kapasitesinin kabaca %70'ine denk gelir; o kabulle tam
+> kapasite ~490 mAh'a çıkar, yani etiketteki 800 mAh'ın epey altında. Kabul bir tahmin
+> olduğu için **hücrenin gerçekten 800 mAh olmadığı sonucu çıkarılamaz** — bunu ancak
+> tam bir deşarj testi söyler.
+
+### Bu koşunun kendi sınırları
+
+1. **Şarj akımı hâlâ bilinmiyor ve iki tahmin çelişiyor.** Şarj hattında ölçülmüş bir
+   direnç yok. Deşarjdan çıkan `R_eff` ile hesaplanınca ~530–740 mA çıkıyor; oysa
+   fazın kulon dengesi (53 dk 49 s'de deşarjın aldığından fazlasını geri koyması
+   gerekir) bunun iki katına yakın bir akım gerektiriyor. İki yöntem uzlaşmıyor —
+   ya efektif direnç yöne göre belirgin biçimde farklı, ya da bu tahminlerden biri
+   geçersiz. **Bu koşu şarj akımını belirlemiyor**; şarj hattına da bilinen bir
+   direnç konmadan çözülmez.
+2. **Çiftlerin çoğu 60 saniyede oturmamış.** 50. ile 60. saniye arasındaki değişim
+   2 mV'ı deşarjda 16 satırın 10'unda, şarjda 15 satırın 12'sinde aşıyor (en büyüğü
+   şarjda %75 eşiğinde 7,44 mV). Akım yüksek olduğu için polarizasyon da büyük;
+   PX103049 koşularından daha fazla satır etkilenmiş. Dolayısıyla **deşarjda
+   toparlanmış değerler bir miktar düşük, şarjda dinlenmiş değerler bir miktar
+   yüksek** — gerçek pencere yukarıdaki tablodan biraz dar.
+3. **ADC kalibre edilmedi.** Kazanç 1,000000, ofset 0,00; mutlak değerlerde ±20–30 mV
+   sistematik kayma olabilir. Buna karşılık 279 gerilim değerinin tamamı ADC'nin
+   1/16 mV ızgarasına oturuyor, `rest_duration_ms` her satırda 61000 ve 31 çiftin
+   hepsi `complete=1`.
+4. **Kapasite doğrulanmadı.** 800 mAh bilgisi hücreden geliyor, ayrı bir deşarj
+   testiyle ölçülmedi.
+5. **Eşik %0 boş demek değil.** Yalnızca gerilim indeksinin tabanı (3000 mV) ve o an
+   yük altında okunmuştur; dinlenmiş karşılığı 3083,9 mV.
+6. **Tek hücre, tek koşu, tek akım.** Oda sıcaklığında, tek bir yük direnciyle.
+
+### Dosyalar
+
+| Dosya | İçerik |
+|---|---|
+| [`data/raw_dump-800mah.log`](data/raw_dump-800mah.log) | Cihazdan alınan ham seri port çıktısı, hiç düzenlenmedi |
+| [`data/measurements-discharge-800mah.csv`](data/measurements-discharge-800mah.csv) | Faz 1 — yük yönünde 16 ölçüm çifti |
+| [`data/measurements-charge-800mah.csv`](data/measurements-charge-800mah.csv) | Faz 2 — şarj yönünde 15 ölçüm çifti |
+| [`data/lookup-discharge-800mah.csv`](data/lookup-discharge-800mah.csv) | 10 mV adımlı arama tablosu — yük altındaki gerilimden dinlenmiş karşılığı |
+| [`data/lookup-charge-800mah.csv`](data/lookup-charge-800mah.csv) | 10 mV adımlı arama tablosu — şarjdaki gerilimden dinlenmiş karşılığı |
+| `graphs/state_overlay-800mah-light.png` / `-dark.png` / `.svg` | Yukarıdaki üç durum grafiği |
+
+CSV'ler ham dump'tan faz faz ayrılmış, sütunları hiç değiştirilmemiş kopyalardır.
+Faz 1 firmware'in yük yönündeki adlarını kullanır (`load_elapsed_ms`, `total_load_ms`,
+`loaded_mv`, `recovered_mv`), faz 2 şarj yönündekileri (`charge_elapsed_ms`,
+`total_charge_ms`, `charging_mv`, `rested_mv`).
+
+Arama tabloları yukarıdakilerle aynı yöntemle üretildi — yalnızca **ölçülen aralığı**
+doldururlar, dışına ekstrapolasyon yapılmaz, ara değerler parça-parça doğrusaldır:
+
+| Tablo | Girdi aralığı | Ne verir |
+|---|---|---|
+| [`lookup-charge-800mah.csv`](data/lookup-charge-800mah.csv) | 3380–4200 mV (şarjda okunan) | dinlenmiş karşılığı |
+| [`lookup-discharge-800mah.csv`](data/lookup-discharge-800mah.csv) | 2990–3850 mV (yük altında okunan) | dinlenmiş karşılığı |
+
+**Bu tablolar PX803035'e aittir.** PX103049 için [`lookup.csv`](data/lookup.csv) ve
+[`lookup-discharge.csv`](data/lookup-discharge.csv) kullanılır; ikisi birbirinin
+yerine geçmez.
+
+## Kodu çalıştırmak
+
+Depoda tek bir script var: [`scripts/plot_voltage.py`](scripts/plot_voltage.py).
+Ölçüm CSV'lerini okur, grafikleri ve arama tablolarını yazar. Cihaza, seri porta
+veya internete ihtiyacı yok — girdisi `data/` altındaki dosyalar.
+
+### Kurulum
+
+Python 3.10 veya üstü gerekiyor (kod `list[dict]` gibi yeni tip yazımını kullanıyor).
+Tek bağımlılık matplotlib.
 
 ```bash
 python -m venv .venv
-.venv/Scripts/activate      # Linux/macOS: source .venv/bin/activate
+.venv/Scripts/activate            # Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+`uv` kullanıyorsan aynı şey:
+
+```bash
+uv venv
+uv pip install -r requirements.txt
+```
+
+### Çalıştırmak
+
+```bash
 python scripts/plot_voltage.py
 ```
 
-Şu dosyalar yeniden yazılır:
+Argüman almaz. Hangi bataryayı işleyeceği script'in başındaki `BATTERY` blokundan
+gelir. Ne yaptığını yazdırır:
 
 ```
-graphs/voltage_overlay-light.png    graphs/discharge_overlay-light.png    graphs/state_overlay-light.png
-graphs/voltage_overlay-dark.png     graphs/discharge_overlay-dark.png     graphs/state_overlay-dark.png
-graphs/voltage_overlay.svg          graphs/discharge_overlay.svg          graphs/state_overlay.svg
-data/lookup.csv                     data/lookup-discharge.csv
+Batarya: Power-Xtra PX803035 (3,7 V / 800 mAh Li-Po)
+Girdi:   data/measurements-charge-800mah.csv (15 cift), data/measurements-discharge-800mah.csv (16 cift)
+Yazilan:
+  graphs/state_overlay-800mah-light.png
+  graphs/state_overlay-800mah-dark.png
+  graphs/state_overlay-800mah.svg
+  data/lookup-charge-800mah.csv
+  data/lookup-discharge-800mah.csv
 ```
 
-Grafikler `data/measurements.csv` (şarj) ve `data/measurements-discharge.csv` (yük)
-dosyalarından üretilir; her iki tema da aynı doğrulanmış kategorik paletin ilk üç
-yuvasını kullanır.
+Listelenen dosyalar **üzerine yazılır**, başkasına dokunulmaz. Çıktı deterministiktir:
+veri değişmediyse PNG'ler bayt bayt aynı çıkar. (SVG'ler hariç — matplotlib içlerine
+üretim tarihi ve rastgele `clip-path` id'leri koyuyor, o yüzden her koşuda içerikçe
+aynı ama baytça farklı olurlar. SVG diff'i görürsen paniğe kapılma.)
+
+Hata alırsan: `... icinde tamamlanmis cift yok` demek, CSV'de `complete=1` olan satır
+bulunamadı demektir — dosya yolu yanlış ya da dump yarım kalmış.
+
+### Bu depodaki iki batarya
+
+Depoda iki ayrı hücrenin verisi var ve script **aynı anda yalnızca birini** işler:
+
+| Branch | `BATTERY` ayarı | Ürettikleri |
+|---|---|---|
+| `main` | **PX803035** (yeni hücre) | `state_overlay-800mah-*`, `lookup-*-800mah.csv` |
+| `px103049` | **PX103049** (ilk hücre) | `voltage_overlay-*`, `discharge_overlay-*`, `state_overlay-*`, `lookup.csv`, `lookup-discharge.csv` |
+
+İki branch'te kod **aynı**; tek fark `BATTERY` bloku. Yani PX103049'un grafiklerini
+yeniden üretmek istiyorsan:
+
+```bash
+git checkout px103049
+python scripts/plot_voltage.py
+```
+
+Her iki branch de her iki hücrenin **verisini** taşır; ayrılan şey yalnızca script'in
+o an neyi işlediği. Bu yüzden `main` üzerinde çalışırken `graphs/voltage_overlay-*.png`
+gibi PX103049 dosyaları yerinde durur ama yeniden üretilmez — onları `px103049`
+branch'i üretir.
+
+### Başka bir batarya için
+
+Yeni bir hücre eklemek script'in başındaki tek bloğu doldurmaktan ibaret:
+
+```python
+BATTERY = dict(
+    model="PX803035",
+    nominal="3,7 V / 800 mAh Li-Po",
+
+    empty_mv=3000.0,        # firmware'deki BatteryConfig.h ile AYNI olmali
+    full_mv=4200.0,
+
+    load_ohms=12.20,        # dummy load'un olculen direnci; bilinmiyorsa None
+
+    charge_csv="measurements-charge-800mah.csv",   # data/ altinda
+    load_csv="measurements-discharge-800mah.csv",
+
+    charge_lookup="lookup-charge-800mah.csv",      # data/ altina yazilir
+    load_lookup="lookup-discharge-800mah.csv",
+
+    graphs=("state",),
+    state_stem="state_overlay-800mah",
+    ...
+)
+```
+
+Sırasıyla:
+
+1. **Dump'ı al.** Cihazdan `DUMP` komutuyla, seri porttan (COM4, 115200 8N1). Portu
+   **DTR/RTS asserted etmeden** aç — aksi halde ESP32 resetlenir ve firmware koşuyu
+   reset sonrası sürdürmediği için o koşu ölür. Çıktıyı olduğu gibi
+   `data/raw_dump-<hücre>.log` olarak kaydet, düzenleme.
+2. **Fazları CSV'ye ayır.** Log'daki `# PHASE,...` satırlarından sonra gelen
+   `row,...` başlığı ve satırları olduğu gibi kopyala; sütunları değiştirme. Yük
+   yönü `loaded_mv`/`recovered_mv`, şarj yönü `charging_mv`/`rested_mv` kullanır —
+   script ikisini de bu adlarla bekliyor.
+3. **`BATTERY` bloğunu doldur.** `empty_mv`/`full_mv` firmware'in `CONFIG` satırından,
+   `load_ohms` yine `CONFIG` satırındaki `load_ohms` alanından gelir.
+4. **Eksen sınırlarını ayarla.** `state_xlim` / `state_ylim` / `state_delta_ylim`
+   elle veriliyor; otomatik hesaplanmıyor ki kaydedilmiş grafikler yeniden
+   üretildiğinde birebir aynı çıksın. Veri aralığını görmek için bir kez çalıştırıp
+   grafiğe bakmak yeterli.
+5. **Çalıştır.**
+
+`graphs` alanı hangi grafiklerin çizileceğini söyler. `"state"` (üç durum üst üste)
+her batarya için çalışır. `"charge"` ve `"load"` ayrıntı grafiklerinin içindeki
+açıklama metinleri PX103049'un sayılarına göre yazılmış (`"sabit akım: ~140 mV"`
+gibi), o yüzden başka bir hücrede açmadan önce `render()` ve `render_discharge()`
+içindeki `annotate()` çağrılarını güncellemek gerekir.
+
+### Renkler
+
+Her iki tema da aynı doğrulanmış kategorik paletin ilk üç yuvasını kullanır (mavi /
+turuncu / aqua); üçü birlikte hem açık hem koyu modda all-pairs kontrast eşiklerini
+geçer. Aqua açık yüzeyde 3:1'in altında kaldığı için seriler grafikte doğrudan
+etiketlenir, ayrıca sayıları README'deki tablolarda durur.
