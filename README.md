@@ -147,7 +147,7 @@ Başlangıç (şarj hiç açılmadan, dinlenmiş): **3255,2 mV**.
 | [`data/measurements-discharge.csv`](data/measurements-discharge.csv) | Deşarj koşusunun 15 ölçüm çifti (yük yönü) |
 | [`data/raw_dump-discharge.log`](data/raw_dump-discharge.log) | Deşarj koşusunun ham seri port çıktısı |
 | [`data/lookup-discharge.csv`](data/lookup-discharge.csv) | 10 mV adımlı arama tablosu — yük altındaki gerilimden dinlenmiş karşılığı |
-| [`scripts/plot_voltage.py`](scripts/plot_voltage.py) | Grafikleri ve arama tablolarını üretir — bu hücrenin çıktıları için `px103049` branch'i ([nasıl](#kodu-çalıştırmak)) |
+| `scripts/plot_voltage.py` (`px103049` dalında) | Bu hücrenin grafiklerini ve arama tablolarını üretir — [nasıl çalıştırılır](#kodu-çalıştırmak) |
 
 Deşarj koşusunun CSV kolonları şarj koşusundan farklı adlandırılır: `load_elapsed_ms`,
 `total_load_ms`, `loaded_mv`, `recovered_mv`. Karşılıkları sırasıyla
@@ -616,20 +616,41 @@ doldururlar, dışına ekstrapolasyon yapılmaz, ara değerler parça-parça do�
 [`lookup-discharge.csv`](data/lookup-discharge.csv) kullanılır; ikisi birbirinin
 yerine geçmez.
 
-## Kodu çalıştırmak
+## Deponun düzeni — hangi dal ne taşıyor
 
-Depoda tek bir script var: [`scripts/plot_voltage.py`](scripts/plot_voltage.py).
-Ölçüm CSV'lerini okur, grafikleri ve arama tablolarını yazar. Cihaza, seri porta
-veya internete ihtiyacı yok — girdisi `data/` altındaki dosyalar.
+`main` **rapordur**: ölçüm verisi, tablolar, grafikler ve yukarıdaki bütün anlatım.
+Kod burada değil. Grafikleri ve arama tablolarını üreten script her bataryanın kendi
+dalında, o hücrenin spesifikasyonlarına ayarlanmış halde durur.
+
+| Dal | Ne var | Batarya |
+|---|---|---|
+| **`main`** | Rapor: `README.md`, `data/`, `graphs/` | — (ikisinin de verisi burada) |
+| **`px103049`** | + `scripts/plot_voltage.py` | Power-Xtra PX103049, **1500 mAh** |
+| **`px803035`** | + `scripts/plot_voltage.py` | Power-Xtra PX803035, **800 mAh** |
+| `archive/sarj` | eski ölçüm dalı | pasif |
+| `archive/ikinci-olcum` | eski ölçüm dalı | pasif |
+
+İki batarya dalındaki kod **birebir aynıdır**; tek fark dosyanın başındaki `BATTERY`
+bloku. Ölçüm verisi (`data/`) ve grafikler (`graphs/`) her dalda bulunur — ayrılan
+tek şey script'in o an hangi hücreyi işlediği.
+
+| Dal | Girdi | Ürettiği |
+|---|---|---|
+| `px103049` | `measurements.csv`, `measurements-discharge.csv` | `voltage_overlay-*`, `discharge_overlay-*`, `state_overlay-*`, `lookup.csv`, `lookup-discharge.csv` |
+| `px803035` | `measurements-charge-800mah.csv`, `measurements-discharge-800mah.csv` | `state_overlay-800mah-*`, `lookup-charge-800mah.csv`, `lookup-discharge-800mah.csv` |
+
+## Kodu çalıştırmak
 
 ### Kurulum
 
 Python 3.10 veya üstü gerekiyor (kod `list[dict]` gibi yeni tip yazımını kullanıyor).
-Tek bağımlılık matplotlib.
+Tek bağımlılık matplotlib. Önce bir batarya dalına geç — `main`'de script yok:
 
 ```bash
+git checkout px803035          # veya: git checkout px103049
+
 python -m venv .venv
-.venv/Scripts/activate            # Linux/macOS: source .venv/bin/activate
+.venv/Scripts/activate         # Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -646,9 +667,8 @@ uv pip install -r requirements.txt
 python scripts/plot_voltage.py
 ```
 
-Argüman almaz. Hangi bataryayı işleyeceği script'in başındaki `BATTERY` blokundan
-gelir. Ne yaptığını yazdırır — aşağıdaki çıktı `main` branch'inden, yani PX803035
-ayarıyla; `px103049` branch'inde aynı komut o hücrenin dosyalarını listeler:
+Argüman almaz. Hangi bataryayı işleyeceği bulunduğun dalın `BATTERY` blokundan gelir.
+Ne yaptığını yazdırır — aşağıdaki çıktı `px803035` dalından:
 
 ```
 Batarya: Power-Xtra PX803035 (3,7 V / 800 mAh Li-Po)
@@ -661,6 +681,8 @@ Yazilan:
   data/lookup-discharge-800mah.csv
 ```
 
+`px103049` dalında aynı komut o hücrenin üç grafiğini ve iki arama tablosunu yazar.
+
 Listelenen dosyalar **üzerine yazılır**, başkasına dokunulmaz. Çıktı deterministiktir:
 veri değişmediyse PNG'ler bayt bayt aynı çıkar. (SVG'ler hariç — matplotlib içlerine
 üretim tarihi ve rastgele `clip-path` id'leri koyuyor, o yüzden her koşuda içerikçe
@@ -669,36 +691,18 @@ aynı ama baytça farklı olurlar. SVG diff'i görürsen paniğe kapılma.)
 Hata alırsan: `... icinde tamamlanmis cift yok` demek, CSV'de `complete=1` olan satır
 bulunamadı demektir — dosya yolu yanlış ya da dump yarım kalmış.
 
-### Bu depodaki iki batarya
+Ürettiğin grafikleri rapora taşımak istiyorsan dosyaları `main`'e alıp orada
+commit'lemen gerekir; `main` kodu değil, çıktıyı tutar.
 
-Depoda iki ayrı hücrenin verisi var ve script **aynı anda yalnızca birini** işler:
+### `BATTERY` bloku
 
-| Branch | `BATTERY` ayarı | Ürettikleri |
-|---|---|---|
-| `main` | **PX803035** (yeni hücre) | `state_overlay-800mah-*`, `lookup-*-800mah.csv` |
-| `px103049` | **PX103049** (ilk hücre) | `voltage_overlay-*`, `discharge_overlay-*`, `state_overlay-*`, `lookup.csv`, `lookup-discharge.csv` |
-
-İki branch'te kod **aynı**; tek fark `BATTERY` bloku. Yani PX103049'un grafiklerini
-yeniden üretmek istiyorsan:
-
-```bash
-git checkout px103049
-python scripts/plot_voltage.py
-```
-
-Her iki branch de her iki hücrenin **verisini** taşır; ayrılan şey yalnızca script'in
-o an neyi işlediği. Bu yüzden `main` üzerinde çalışırken `graphs/voltage_overlay-*.png`
-gibi PX103049 dosyaları yerinde durur ama yeniden üretilmez — onları `px103049`
-branch'i üretir.
-
-### Başka bir batarya için
-
-Yeni bir hücre eklemek script'in başındaki tek bloğu doldurmaktan ibaret:
+Script'te batarya-özel tek yer burası. `px803035` dalındaki hali:
 
 ```python
 BATTERY = dict(
     model="PX803035",
     nominal="3,7 V / 800 mAh Li-Po",
+    capacity_mah=800,       # etiketten; dogrulanmadi
 
     empty_mv=3000.0,        # firmware'deki BatteryConfig.h ile AYNI olmali
     full_mv=4200.0,
@@ -717,7 +721,14 @@ BATTERY = dict(
 )
 ```
 
-Sırasıyla:
+`px103049` dalında aynı bloğun içi `model="PX103049"`, `capacity_mah=1500`,
+`load_ohms=None` (o koşularda yükün direnci kaydedilmedi) ve kendi dosya adlarıyla
+doludur.
+
+### Üçüncü bir batarya eklemek
+
+Yeni hücre = yeni dal. `main`'den dallan, script'i bir batarya dalından al, `BATTERY`
+bloğunu doldur:
 
 1. **Dump'ı al.** Cihazdan `DUMP` komutuyla, seri porttan (COM4, 115200 8N1). Portu
    **DTR/RTS asserted etmeden** aç — aksi halde ESP32 resetlenir ve firmware koşuyu
@@ -727,13 +738,14 @@ Sırasıyla:
    `row,...` başlığı ve satırları olduğu gibi kopyala; sütunları değiştirme. Yük
    yönü `loaded_mv`/`recovered_mv`, şarj yönü `charging_mv`/`rested_mv` kullanır —
    script ikisini de bu adlarla bekliyor.
-3. **`BATTERY` bloğunu doldur.** `empty_mv`/`full_mv` firmware'in `CONFIG` satırından,
-   `load_ohms` yine `CONFIG` satırındaki `load_ohms` alanından gelir.
+3. **`BATTERY` bloğunu doldur.** `empty_mv`/`full_mv` ve `load_ohms` firmware'in
+   `CONFIG` satırından gelir. `capacity_mah` etiketten — ve etiketin yanlış
+   olabileceğini unutma; bu deponun ilk sürümünde tam olarak bu oldu.
 4. **Eksen sınırlarını ayarla.** `state_xlim` / `state_ylim` / `state_delta_ylim`
    elle veriliyor; otomatik hesaplanmıyor ki kaydedilmiş grafikler yeniden
    üretildiğinde birebir aynı çıksın. Veri aralığını görmek için bir kez çalıştırıp
    grafiğe bakmak yeterli.
-5. **Çalıştır.**
+5. **Çalıştır**, çıktıları ve raporu `main`'e taşı.
 
 `graphs` alanı hangi grafiklerin çizileceğini söyler. `"state"` (üç durum üst üste)
 her batarya için çalışır. `"charge"` ve `"load"` ayrıntı grafiklerinin içindeki
