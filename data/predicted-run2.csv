@@ -1,3 +1,0 @@
-threshold_pct,charging_mv,est_rested_mv,est_delta_mv,uncertainty_mv,basis,source
-90,4081.50,3990.58,90.92,7.3,run1_plus_mean_offset,predicted
-95,4140.12,4080.07,60.05,7.3,run1_plus_mean_offset,predicted
