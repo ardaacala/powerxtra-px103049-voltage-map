@@ -483,6 +483,38 @@ noktaları — CSV'lerde:
 yük yönü) ve [`measurements-charge-800mah.csv`](data/measurements-charge-800mah.csv)
 (15 çift, şarj yönü).
 
+### Şarj yönü ayrıntısı
+
+![PX803035 — şarjda ve dinlenmiş gerilim](graphs/voltage_overlay-800mah-light.png#gh-light-mode-only)
+![PX803035 — şarjda ve dinlenmiş gerilim](graphs/voltage_overlay-800mah-dark.png#gh-dark-mode-only)
+
+Deponun başındaki [şarj grafiğinin](#şarj-yönü-ayrıntısı) bu hücredeki karşılığı. Üst
+panel iki gerilimi üst üste gösterir, taralı bant farkın kendisidir; alt panel farkı
+ayrıca çizer.
+
+Kesikli çizgi şarj IC'sinin 4,20 V tavanı — ve bu hücrede **ona ulaşıldı**. PX103049
+koşusu 4140 mV'ta takılıp zaman aşımıyla bitmişti; burada eşik %100, 4200,6 mV'ta
+alındı. Fark sabit akım boyunca 193–250 mV'ta geziniyor, CV'ye geçişte 159 → 91 mV'a
+kapanıyor.
+
+### Deşarj yönü ayrıntısı
+
+![PX803035 — yük altında ve toparlanmış gerilim](graphs/discharge_overlay-800mah-light.png#gh-light-mode-only)
+![PX803035 — yük altında ve toparlanmış gerilim](graphs/discharge_overlay-800mah-dark.png#gh-dark-mode-only)
+
+Aynı düzenin yük yönündeki eşi. Toparlanmış değer yük altındakinin üstünde; kesikli
+çizgi firmware'in boş kabulü (3,00 V), koşu yük altında 2982,9 mV'ta bitti.
+
+**Alt panel PX103049'unkinden farklı davranıyor.** Orada sapma boşaldıkça büyüyordu
+(−46 → −80 mV); burada ilk iki satırdan sonra **düz** kalıyor, −90 ile −106 mV
+arasında. Sebebi iki etkinin birbirini götürmesi: yük sabit direnç olduğu için akım
+gerilimle birlikte düşüyor (%65'ten %0'a 310 → 245 mA, %21 azalma) ama iç direnç aynı
+aralıkta 323 → 413 mΩ'a çıkıyor (%28 artış). Çarpımları — yani sapma — neredeyse sabit kalıyor.
+PX103049'da yük akımı daha küçük olduğu için bu denge kurulmuyordu.
+
+İlk iki satır (%75 ve %70) bu düzlüğün dışında, −69 ve −84 mV: yük o satırlarda
+yalnızca 6 ve 38 saniyedir bağlıydı, polarizasyon henüz oturmamıştı.
+
 ### Koşunun iki fazı
 
 | | Faz 1 — yük altında deşarj | Faz 2 — şarj |
@@ -597,7 +629,9 @@ OCV→SoC eğrisi içermez.
 | [`data/measurements-charge-800mah.csv`](data/measurements-charge-800mah.csv) | Faz 2 — şarj yönünde 15 ölçüm çifti |
 | [`data/lookup-discharge-800mah.csv`](data/lookup-discharge-800mah.csv) | 10 mV adımlı arama tablosu — yük altındaki gerilimden dinlenmiş karşılığı |
 | [`data/lookup-charge-800mah.csv`](data/lookup-charge-800mah.csv) | 10 mV adımlı arama tablosu — şarjdaki gerilimden dinlenmiş karşılığı |
-| `graphs/state_overlay-800mah-light.png` / `-dark.png` / `.svg` | Yukarıdaki üç durum grafiği |
+| `graphs/state_overlay-800mah-*` | Üç durum üst üste |
+| `graphs/voltage_overlay-800mah-*` | Şarj yönü ayrıntısı |
+| `graphs/discharge_overlay-800mah-*` | Deşarj yönü ayrıntısı |
 
 CSV'ler ham dump'tan faz faz ayrılmış, sütunları hiç değiştirilmemiş kopyalardır.
 Faz 1 firmware'in yük yönündeki adlarını kullanır (`load_elapsed_ms`, `total_load_ms`,
@@ -637,7 +671,7 @@ tek şey script'in o an hangi hücreyi işlediği.
 | Dal | Girdi | Ürettiği |
 |---|---|---|
 | `px103049` | `measurements.csv`, `measurements-discharge.csv` | `voltage_overlay-*`, `discharge_overlay-*`, `state_overlay-*`, `lookup.csv`, `lookup-discharge.csv` |
-| `px803035` | `measurements-charge-800mah.csv`, `measurements-discharge-800mah.csv` | `state_overlay-800mah-*`, `lookup-charge-800mah.csv`, `lookup-discharge-800mah.csv` |
+| `px803035` | `measurements-charge-800mah.csv`, `measurements-discharge-800mah.csv` | `voltage_overlay-800mah-*`, `discharge_overlay-800mah-*`, `state_overlay-800mah-*`, `lookup-charge-800mah.csv`, `lookup-discharge-800mah.csv` |
 
 ## Kodu çalıştırmak
 
@@ -674,6 +708,12 @@ Ne yaptığını yazdırır — aşağıdaki çıktı `px803035` dalından:
 Batarya: Power-Xtra PX803035 (3,7 V / 800 mAh Li-Po)
 Girdi:   data/measurements-charge-800mah.csv (15 cift), data/measurements-discharge-800mah.csv (16 cift)
 Yazilan:
+  graphs/voltage_overlay-800mah-light.png
+  graphs/voltage_overlay-800mah-dark.png
+  graphs/voltage_overlay-800mah.svg
+  graphs/discharge_overlay-800mah-light.png
+  graphs/discharge_overlay-800mah-dark.png
+  graphs/discharge_overlay-800mah.svg
   graphs/state_overlay-800mah-light.png
   graphs/state_overlay-800mah-dark.png
   graphs/state_overlay-800mah.svg
@@ -715,7 +755,7 @@ BATTERY = dict(
     charge_lookup="lookup-charge-800mah.csv",      # data/ altina yazilir
     load_lookup="lookup-discharge-800mah.csv",
 
-    graphs=("state",),
+    graphs=("charge", "load", "state"),
     state_stem="state_overlay-800mah",
     ...
 )
@@ -747,11 +787,13 @@ bloğunu doldur:
    grafiğe bakmak yeterli.
 5. **Çalıştır**, çıktıları ve raporu `main`'e taşı.
 
-`graphs` alanı hangi grafiklerin çizileceğini söyler. `"state"` (üç durum üst üste)
-her batarya için çalışır. `"charge"` ve `"load"` ayrıntı grafiklerinin içindeki
-açıklama metinleri PX103049'un sayılarına göre yazılmış (`"sabit akım: ~140 mV"`
-gibi), o yüzden başka bir hücrede açmadan önce `render()` ve `render_discharge()`
-içindeki `annotate()` çağrılarını güncellemek gerekir.
+`graphs` alanı hangi grafiklerin çizileceğini söyler: `"state"` üç durum üst üste,
+`"charge"` şarj yönü ayrıntısı, `"load"` yük yönü ayrıntısı. Üçü de her batarya için
+çalışır — ayrıntı grafiklerinin eksen sınırları, tavan/taban çizgisinin metni ve alt
+paneldeki açıklamalar da `BATTERY` blokunda (`charge_notes`, `load_notes`,
+`charge_ceiling_note`, `load_floor_note` …), fonksiyonların içinde gömülü değil. Yeni
+bir hücrede bu metinleri o hücrenin sayılarına göre yazman gerekir; iki mevcut
+bataryanınki farklı, çünkü davranışları farklı.
 
 ### Renkler
 
