@@ -628,7 +628,8 @@ python scripts/plot_voltage.py
 ```
 
 Argüman almaz. Hangi bataryayı işleyeceği script'in başındaki `BATTERY` blokundan
-gelir. Ne yaptığını yazdırır:
+gelir. Ne yaptığını yazdırır — aşağıdaki çıktı `main` branch'inden, yani PX803035
+ayarıyla; `px103049` branch'inde aynı komut o hücrenin dosyalarını listeler:
 
 ```
 Batarya: Power-Xtra PX803035 (3,7 V / 800 mAh Li-Po)
