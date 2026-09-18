@@ -2,7 +2,7 @@
 
 Hangi batarya islenecegi dosyanin basindaki BATTERY blogundan gelir; script'te
 batarya-ozel baska bir yer yoktur. Su an yapilandirilmis olan: PX803035.
-Onceki hucrenin (PX103049) ayari `px103049` branch'inde.
+Diger hucrenin (PX103049) ayari `px103049` branch'inde.
 
 Girdiler (data/ altinda, BATTERY'den):
   BATTERY["charge_csv"]  -> sarj yonundeki olcum ciftleri
@@ -44,6 +44,8 @@ OUT = ROOT / "graphs"
 BATTERY = dict(
     model="PX803035",
     nominal="3,7 V / 800 mAh Li-Po",
+    capacity_mah=800,           # hucre etiketinden; desarj fazindaki kulon
+                                # sayimi 345 mAh verdi (README'ye bak).
 
     # Gerilim olcegi -- firmware'deki BatteryConfig.h ile AYNI olmali.
     # voltage_pct bu ikisinden hesaplanir; dogrusal bir indeks, doluluk degil.
@@ -82,7 +84,6 @@ BATTERY = dict(
     state_delta_ylim=(-170, 300),
     state_note_x=3.46,
 )
-
 DATA = ROOT / "data" / BATTERY["charge_csv"]
 DATA_DISCHARGE = ROOT / "data" / BATTERY["load_csv"]
 EMPTY_MV = BATTERY["empty_mv"]
