@@ -665,8 +665,10 @@ dalında, o hücrenin spesifikasyonlarına ayarlanmış halde durur.
 | `archive/ikinci-olcum` | eski ölçüm dalı | pasif |
 
 İki batarya dalındaki kod **birebir aynıdır**; tek fark dosyanın başındaki `BATTERY`
-bloku. Ölçüm verisi (`data/`) ve grafikler (`graphs/`) her dalda bulunur — ayrılan
-tek şey script'in o an hangi hücreyi işlediği.
+bloku. Buna karşılık **her dal yalnızca kendi hücresinin** verisini ve grafiklerini
+taşır: `px803035` dalında PX103049'un dosyaları yoktur, `px103049` dalında da
+PX803035'inkiler. İkisi bir arada yalnızca `main`'de, yani raporda bulunur. Batarya
+dallarının README'si de o dala özel kısa bir nottur; bu uzun rapor `main`'e aittir.
 
 | Dal | Girdi | Ürettiği |
 |---|---|---|
