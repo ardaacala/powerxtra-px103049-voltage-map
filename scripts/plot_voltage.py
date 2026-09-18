@@ -64,12 +64,9 @@ BATTERY = dict(
     charge_lookup="lookup-charge-800mah.csv",
     load_lookup="lookup-discharge-800mah.csv",
 
-    # Uretilecek grafikler. "state" her batarya icin calisir (uc durum ust uste).
-    # "charge" ve "load" ayrinti grafikleridir; icindeki aciklama metinleri
-    # PX103049'un sayilarina gore yazilmis, o yuzden tasinabilir degil --
-    # baska bir hucrede acmadan once render()/render_discharge() icindeki
-    # annotate() metinlerini o hucreye gore guncelle.
-    graphs=("state",),
+    # Bu hucrenin uc grafigi de uretilir. Ayrinti grafiklerinin eksenleri ve
+    # aciklama metinleri de asagida, bu blogun icinde.
+    graphs=("charge", "load", "state"),
     charge_stem="voltage_overlay-800mah",
     load_stem="discharge_overlay-800mah",
     state_stem="state_overlay-800mah",
@@ -83,6 +80,25 @@ BATTERY = dict(
     state_ylim=(2.95, 4.26),
     state_delta_ylim=(-170, 300),
     state_note_x=3.46,
+
+    # --- Sarj ayrinti grafigi (charge_stem) ---
+    charge_ylim=(3.15, 4.26),
+    charge_xlim=(26, 104),
+    charge_delta_ylim=(0, 290),
+    charge_ceiling_note="4,20 V şarj tavanı — eşik %100 alındı, 4200,6 mV",
+    charge_notes=[("sabit akım: 193–250 mV", 62, 272, "center"),
+                  ("sabit gerilim: fark kapanıyor", 102, 45, "right")],
+    charge_footnote=("15 ölçüm çifti — tek koşunun ikinci fazı (deşarjdan sonra şarj). "
+                     "Dinlenme 60 s; ADC kalibre edilmedi."),
+
+    # --- Yuk ayrinti grafigi (load_stem) ---
+    load_ylim=(2.94, 3.98),
+    load_xlim=(-4, 80),
+    load_delta_ylim=(-125, 0),
+    load_floor_note="3,00 V — firmware'in boş kabulü; koşu yük altında 2,98 V'ta bitti",
+    load_notes=[("ilk iki satır dışında düz: −90 … −106 mV", 40, -115, "center")],
+    load_footnote=("16 ölçüm çifti — tek koşunun ilk fazı, 12,2 Ω dummy load (245–316 mA). "
+                   "Dinlenme 60 s; ADC kalibre edilmedi."),
 )
 DATA = ROOT / "data" / BATTERY["charge_csv"]
 DATA_DISCHARGE = ROOT / "data" / BATTERY["load_csv"]
@@ -231,16 +247,18 @@ def render(rows: list[dict], theme_name: str, svg: bool = False) -> Path:
     )
     ax.set_ylabel("Batarya gerilimi (V)", color=t["muted"], fontsize=11)
     ax.yaxis.set_major_locator(MultipleLocator(0.1))
-    ax.set_ylim(3.20, 4.26)
-    ax.set_xlim(32, 104)
+    ax.set_ylim(*BATTERY["charge_ylim"])
+    ax.set_xlim(*BATTERY["charge_xlim"])
     legend = ax.legend(loc="lower right", frameon=False, fontsize=10.5)
     for text in legend.get_texts():
         text.set_color(t["text"])
 
     # Şarj IC'sinin sabit gerilim tavanı: üst ucun neden belirsizleştiği.
-    ax.axhline(4.2, color=t["muted"], linewidth=1, linestyle=(0, (4, 4)), zorder=2)
-    ax.annotate("4,20 V şarj tavanı — %100 eşiğine hiç ulaşılamadı",
-                xy=(33.5, 4.2), xytext=(0, -6), textcoords="offset points",
+    ax.axhline(FULL_MV / 1000, color=t["muted"], linewidth=1,
+               linestyle=(0, (4, 4)), zorder=2)
+    ax.annotate(BATTERY["charge_ceiling_note"],
+                xy=(BATTERY["charge_xlim"][0] + 1.5, FULL_MV / 1000),
+                xytext=(0, -6), textcoords="offset points",
                 color=t["muted"], fontsize=9.5, va="top", ha="left")
 
     # --- Alt panel: aradaki fark ---------------------------------------------
@@ -251,18 +269,14 @@ def render(rows: list[dict], theme_name: str, svg: bool = False) -> Path:
     ax_delta.set_xlabel("Gerilim ölçeği eşiği (%) — gerçek doluluk değil",
                         color=t["muted"], fontsize=11)
     ax_delta.xaxis.set_major_locator(MultipleLocator(5))
-    ax_delta.set_ylim(0, 200)
+    ax_delta.set_ylim(*BATTERY["charge_delta_ylim"])
 
     # Sabit akım / sabit gerilim geçişi farkın çöküşüyle görülür.
-    ax_delta.annotate("sabit akım: ~140 mV", xy=(57, 172),
-                      color=t["text"], fontsize=10, ha="center", va="center")
-    ax_delta.annotate("sabit gerilim: fark kapanıyor", xy=(96, 32),
-                      color=t["text"], fontsize=10, ha="right", va="center")
+    for text, nx, ny, ha in BATTERY["charge_notes"]:
+        ax_delta.annotate(text, xy=(nx, ny), color=t["text"], fontsize=10,
+                          ha=ha, va="center")
 
-    fig.text(0.008, 0.012,
-             "13 ölçüm çifti — ESP32 + TPS22919, GPIO34 üzerinden 10k/10k bölücü. "
-             "Dinlenme 60 s; ADC kalibre edilmedi.",
-             color=t["muted"], fontsize=9)
+    fig.text(0.008, 0.012, BATTERY["charge_footnote"], color=t["muted"], fontsize=9)
     fig.subplots_adjust(left=0.085, right=0.845, top=0.925, bottom=0.105)
 
     OUT.mkdir(exist_ok=True)
@@ -330,16 +344,18 @@ def render_discharge(rows: list[dict], theme_name: str, svg: bool = False) -> Pa
     )
     ax.set_ylabel("Batarya gerilimi (V)", color=t["muted"], fontsize=11)
     ax.yaxis.set_major_locator(MultipleLocator(0.1))
-    ax.set_ylim(2.94, 3.96)
-    ax.set_xlim(-4, 76)
+    ax.set_ylim(*BATTERY["load_ylim"])
+    ax.set_xlim(*BATTERY["load_xlim"])
     legend = ax.legend(loc="upper left", frameon=False, fontsize=10.5)
     for text in legend.get_texts():
         text.set_color(t["text"])
 
     # Firmware'in bos kabulu: sarj grafigindeki 4,20 V tavaninin karsiligi.
-    ax.axhline(3.0, color=t["muted"], linewidth=1, linestyle=(0, (4, 4)), zorder=2)
-    ax.annotate("3,00 V — firmware'in boş kabulü; koşu yük altında 2,99 V'ta bitti",
-                xy=(-3, 3.0), xytext=(0, 6), textcoords="offset points",
+    ax.axhline(EMPTY_MV / 1000, color=t["muted"], linewidth=1,
+               linestyle=(0, (4, 4)), zorder=2)
+    ax.annotate(BATTERY["load_floor_note"],
+                xy=(BATTERY["load_xlim"][0] + 1, EMPTY_MV / 1000),
+                xytext=(0, 6), textcoords="offset points",
                 color=t["muted"], fontsize=9.5, va="bottom", ha="left")
 
     # --- Alt panel: aradaki fark ---------------------------------------------
@@ -350,16 +366,14 @@ def render_discharge(rows: list[dict], theme_name: str, svg: bool = False) -> Pa
     ax_delta.set_xlabel("Gerilim ölçeği eşiği (%) — gerçek doluluk değil",
                         color=t["muted"], fontsize=11)
     ax_delta.xaxis.set_major_locator(MultipleLocator(5))
-    ax_delta.set_ylim(-100, 0)
+    ax_delta.set_ylim(*BATTERY["load_delta_ylim"])
 
     # Sarj yonunun tersi: sapma bosaldikca BUYUYOR, cunku ic direnc artiyor.
-    ax_delta.annotate("boşaldıkça büyüyor: −46 → −80 mV", xy=(38, -88),
-                      color=t["text"], fontsize=10, ha="center", va="center")
+    for text, nx, ny, ha in BATTERY["load_notes"]:
+        ax_delta.annotate(text, xy=(nx, ny), color=t["text"], fontsize=10,
+                          ha=ha, va="center")
 
-    fig.text(0.008, 0.012,
-             "15 ölçüm çifti — aynı düzenek, anahtarın ucunda sabit dummy load. "
-             "Dinlenme 60 s; ADC kalibre edilmedi.",
-             color=t["muted"], fontsize=9)
+    fig.text(0.008, 0.012, BATTERY["load_footnote"], color=t["muted"], fontsize=9)
     fig.subplots_adjust(left=0.085, right=0.845, top=0.925, bottom=0.105)
 
     OUT.mkdir(exist_ok=True)
