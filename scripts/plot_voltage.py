@@ -1,8 +1,8 @@
 """Sarj / dinlenmis / yuk altinda gerilim haritasi grafikleri.
 
 Hangi batarya islenecegi dosyanin basindaki BATTERY blogundan gelir; script'te
-batarya-ozel baska bir yer yoktur. Su an yapilandirilmis olan: PX803035.
-Diger hucrenin (PX103049) ayari `px103049` branch'inde.
+batarya-ozel baska bir yer yoktur. Su an yapilandirilmis olan: LG INR18650 MJ1.
+Onceki hucrelerin ayari `px103049` ve `px803035` branch'lerinde.
 
 Girdiler (data/ altinda, BATTERY'den):
   BATTERY["charge_csv"]  -> sarj yonundeki olcum ciftleri
@@ -35,21 +35,28 @@ OUT = ROOT / "graphs"
 #
 # Bu blok disinda script'te batarya-ozel hicbir sey yok. Baska bir hucreye
 # gecmek icin yalnizca burasi degisir -- girdi CSV'leri, cikti adlari, gerilim
-# olcegi ve uc durum grafiginin eksenleri. Onceki hucrenin (PX103049) hazir
-# ayari `px103049` branch'inde ayni yerde duruyor.
+# olcegi ve uc durum grafiginin eksenleri. Onceki hucrelerin (PX103049,
+# PX803035) hazir ayari kendi branch'lerinde ayni yerde duruyor.
 #
 # Nasil calistirilacagi ve blogun nasil doldurulacagi README'de:
 # "Kodu calistirmak" ve "Baska bir batarya icin".
+#
+# Bu hucre henuz olculmedi. Olcek, dosya adlari ve yuk direnci firmware'e
+# gore kesin; eksen sinirlari ve metinler ise datasheet'ten tahmin edilmis
+# BASLANGIC degerleri -- ilk DUMP gelince veriye gore duzeltilecek.
 # ===========================================================================
 BATTERY = dict(
-    model="PX803035",
-    nominal="3,7 V / 800 mAh Li-Po",
-    capacity_mah=800,           # hucre etiketinden; desarj fazindaki kulon
-                                # sayimi 345 mAh verdi (README'ye bak).
+    maker="LG",
+    model="INR18650 MJ1",
+    nominal="3,635 V / 3400 mAh Li-ion",
+    capacity_mah=3400,          # sargi etiketinden (3.40Ah, datasheet minimumu);
+                                # tipik deger 3500 mAh.
 
     # Gerilim olcegi -- firmware'deki BatteryConfig.h ile AYNI olmali.
     # voltage_pct bu ikisinden hesaplanir; dogrusal bir indeks, doluluk degil.
-    empty_mv=3000.0,
+    # Datasheet alt siniri 2,50 V; firmware'in guvenlik tabanlari (2,7 / 2,6 /
+    # 2,5 V) olcegin altinda kalmak zorunda oldugu icin bos = 2,80 V.
+    empty_mv=2800.0,
     full_mv=4200.0,
 
     # Dummy load'un olculen direnci (CONFIG satirindaki load_ohms).
@@ -57,47 +64,46 @@ BATTERY = dict(
     load_ohms=12.20,
 
     # Girdiler: data/ altindaki olcum CSV'leri.
-    charge_csv="measurements-charge-800mah.csv",
-    load_csv="measurements-discharge-800mah.csv",
+    charge_csv="measurements-charge-mj1.csv",
+    load_csv="measurements-discharge-mj1.csv",
 
     # Ciktilar: data/ altindaki arama tablolari.
-    charge_lookup="lookup-charge-800mah.csv",
-    load_lookup="lookup-discharge-800mah.csv",
+    charge_lookup="lookup-charge-mj1.csv",
+    load_lookup="lookup-discharge-mj1.csv",
 
     # Bu hucrenin uc grafigi de uretilir. Ayrinti grafiklerinin eksenleri ve
     # aciklama metinleri de asagida, bu blogun icinde.
     graphs=("charge", "load", "state"),
-    charge_stem="voltage_overlay-800mah",
-    load_stem="discharge_overlay-800mah",
-    state_stem="state_overlay-800mah",
+    charge_stem="voltage_overlay-mj1",
+    load_stem="discharge_overlay-mj1",
+    state_stem="state_overlay-mj1",
 
     # Uc durum grafiginin ekseni ve metinleri. Sinirlar elle veriliyor ki
     # kaydedilmis grafikler yeniden uretildiginde birebir ayni ciksin.
     state_label="Şarj olurken",
-    state_footnote=("Tek koşu, iki faz: 16 çift yük yönünde (12,2 Ω, 245–316 mA), "
-                    "15 çift şarj yönünde. 60 s dinlenme; ADC kalibre edilmedi."),
-    state_xlim=(3.06, 4.13),
-    state_ylim=(2.95, 4.26),
-    state_delta_ylim=(-170, 300),
-    state_note_x=3.46,
+    state_footnote=("Tek koşu, iki faz: önce yük yönünde (12,2 Ω, ≈0,23–0,34 A), "
+                    "sonra şarj yönünde. 60 s dinlenme; ADC kalibre edilmedi."),
+    state_xlim=(2.85, 4.20),
+    state_ylim=(2.75, 4.26),
+    state_delta_ylim=(-100, 300),
+    state_note_x=3.40,
 
     # --- Sarj ayrinti grafigi (charge_stem) ---
-    charge_ylim=(3.15, 4.26),
-    charge_xlim=(26, 104),
-    charge_delta_ylim=(0, 290),
-    charge_ceiling_note="4,20 V şarj tavanı — eşik %100 alındı, 4200,6 mV",
-    charge_notes=[("sabit akım: 193–250 mV", 62, 272, "center"),
-                  ("sabit gerilim: fark kapanıyor", 102, 45, "right")],
-    charge_footnote=("15 ölçüm çifti — tek koşunun ikinci fazı (deşarjdan sonra şarj). "
+    charge_ylim=(2.75, 4.26),
+    charge_xlim=(-4, 104),
+    charge_delta_ylim=(0, 300),
+    charge_ceiling_note="4,20 V şarj tavanı",
+    charge_notes=[],
+    charge_footnote=("Tek koşunun ikinci fazı (deşarjdan sonra şarj). "
                      "Dinlenme 60 s; ADC kalibre edilmedi."),
 
     # --- Yuk ayrinti grafigi (load_stem) ---
-    load_ylim=(2.94, 3.98),
-    load_xlim=(-4, 80),
-    load_delta_ylim=(-125, 0),
-    load_floor_note="3,00 V — firmware'in boş kabulü; koşu yük altında 2,98 V'ta bitti",
-    load_notes=[("ilk iki satır dışında düz: −90 … −106 mV", 40, -115, "center")],
-    load_footnote=("16 ölçüm çifti — tek koşunun ilk fazı, 12,2 Ω dummy load (245–316 mA). "
+    load_ylim=(2.75, 4.26),
+    load_xlim=(-4, 104),
+    load_delta_ylim=(-100, 0),
+    load_floor_note="2,80 V — firmware'in boş kabulü (datasheet alt sınırı 2,50 V)",
+    load_notes=[],
+    load_footnote=("Tek koşunun ilk fazı, 12,2 Ω dummy load (≈0,23–0,34 A, ≈0,1C). "
                    "Dinlenme 60 s; ADC kalibre edilmedi."),
 )
 DATA = ROOT / "data" / BATTERY["charge_csv"]
@@ -242,7 +248,7 @@ def render(rows: list[dict], theme_name: str, svg: bool = False) -> Path:
                 fontweight="bold", va="top", ha="left")
 
     ax.set_title(
-        f"Power-Xtra {BATTERY['model']} ({BATTERY['nominal']}) — şarj ve dinlenmiş gerilim",
+        f"{BATTERY['maker']} {BATTERY['model']} ({BATTERY['nominal']}) — şarj ve dinlenmiş gerilim",
         color=t["text"], fontsize=14, fontweight="bold", loc="left", pad=14,
     )
     ax.set_ylabel("Batarya gerilimi (V)", color=t["muted"], fontsize=11)
@@ -338,7 +344,7 @@ def render_discharge(rows: list[dict], theme_name: str, svg: bool = False) -> Pa
                 fontweight="bold", va="top", ha="left")
 
     ax.set_title(
-        f"Power-Xtra {BATTERY['model']} ({BATTERY['nominal']}) — yük altında ve "
+        f"{BATTERY['maker']} {BATTERY['model']} ({BATTERY['nominal']}) — yük altında ve "
         "toparlanmış gerilim",
         color=t["text"], fontsize=13.5, fontweight="bold", loc="left", pad=14,
     )
@@ -504,6 +510,10 @@ def render_states(
 
 def main() -> None:
     """Yapilandirilmis bataryanin grafiklerini ve arama tablolarini uretir."""
+    for path in (DATA, DATA_DISCHARGE):
+        if not path.exists():
+            raise SystemExit(f"{path.relative_to(ROOT)} yok -- once cihazdan DUMP alinip "
+                             "olcum CSV'leri bu adla data/ altina konmali.")
     charge = load_rows()
     if not charge:
         raise SystemExit(f"data/{BATTERY['charge_csv']} icinde tamamlanmis cift yok.")
@@ -513,7 +523,7 @@ def main() -> None:
 
     state_opts = dict(
         stem=BATTERY["state_stem"],
-        title=(f"Power-Xtra {BATTERY['model']} — aynı hücre, üç durum: "
+        title=(f"{BATTERY['maker']} {BATTERY['model']} — aynı hücre, üç durum: "
                "şarjda, dinlenmiş, yük altında"),
         charge_label=BATTERY["state_label"],
         footnote=BATTERY["state_footnote"],
@@ -540,7 +550,7 @@ def main() -> None:
                      name=BATTERY["load_lookup"], first_col="loaded_mv"),
     ]
 
-    print(f"Batarya: Power-Xtra {BATTERY['model']} ({BATTERY['nominal']})")
+    print(f"Batarya: {BATTERY['maker']} {BATTERY['model']} ({BATTERY['nominal']})")
     print(f"Girdi:   data/{BATTERY['charge_csv']} ({len(charge)} cift), "
           f"data/{BATTERY['load_csv']} ({len(load)} cift)")
     print("Yazilan:")

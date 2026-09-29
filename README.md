@@ -1,25 +1,41 @@
-# `px803035` — Power-Xtra PX803035 (3,7 V / 800 mAh Li-Po)
+# `inr18650mj1` — LG INR18650 MJ1 (3,635 V / 3400 mAh Li-ion)
 
-Bu dal **yalnızca bu hücreye** aittir: kendi ölçüm verisi, kendi grafikleri ve
-`BATTERY` bloğu bu hücreye ayarlanmış script. Diğer hücrenin (PX103049, 1500 mAh)
-dosyaları burada **yok** — onlar `px103049` dalında.
+Bu dal **yalnızca bu hücreye** aittir. Hücre **henüz ölçülmedi**: dalda şimdilik
+yalnızca bu hücreye ayarlanmış script var, `data/` ve `graphs/` ilk koşudan sonra
+dolacak. Önceki hücrelerin dosyaları kendi dallarında (`px103049`, `px803035`).
 
-**Ölçümün anlatıldığı rapor `main` dalındadır.** Tablolar, tutarlılık kontrolleri ve
-sınırlar orada; bu dal kodu ve girdisini taşır.
+**Ölçümün anlatıldığı rapor `main` dalındadır.**
 
-## Bu daldakiler
+## Hücre
 
-| Dosya | İçerik |
-|---|---|
-| `data/raw_dump-800mah.log` | Cihazdan alınan ham seri port çıktısı, hiç düzenlenmedi |
-| `data/measurements-discharge-800mah.csv` | Faz 1 — yük yönünde 16 ölçüm çifti |
-| `data/measurements-charge-800mah.csv` | Faz 2 — şarj yönünde 15 ölçüm çifti |
-| `data/lookup-discharge-800mah.csv` | Yük altındaki gerilimden dinlenmiş karşılığı (10 mV adım) |
-| `data/lookup-charge-800mah.csv` | Şarjdaki gerilimden dinlenmiş karşılığı (10 mV adım) |
-| `graphs/state_overlay-800mah-*` | Üç durum üst üste |
-| `graphs/voltage_overlay-800mah-*` | Şarj yönü ayrıntısı |
-| `graphs/discharge_overlay-800mah-*` | Deşarj yönü ayrıntısı |
-| `scripts/plot_voltage.py` | Grafikleri ve arama tablolarını üretir |
+| | Değer | Kaynak |
+|---|---|---|
+| Model | LG INR18650 MJ1, 18650 Li-ion (NMC) | sargı etiketi |
+| Kapasite | 3400 mAh minimum / 3500 mAh tipik | etiket `3.40Ah` / datasheet |
+| Nominal gerilim | 3,635 V | datasheet |
+| Şarj | 4,20 V ± 0,05 V CC-CV | datasheet |
+| Deşarj alt sınırı | 2,50 V | datasheet |
+| Koruma | hücre üstünde koruma PCB'si var | fotoğraf |
+
+## Firmware ayarı (`tps22919_switch_test/include/BatteryConfig.h`)
+
+Düzenek aynı: ESP32 + iki TPS22919 (GPIO4 yük, GPIO17 şarj) + 10 kΩ/10 kΩ bölücü
+(GPIO32) + 12,2 Ω dummy load. PX803035'e göre değişenler:
+
+| Sabit | PX803035 | MJ1 | Neden |
+|---|---|---|---|
+| `EMPTY_MV` | 3000 | **2800** | Li-ion 2,5 V'a kadar iner; güvenlik tabanları ölçeğin altında kalmak zorunda |
+| `DISCHARGE_CUTOFF_MV` | 2500 | **2600** | taban sırası: inhibit < cutoff < validity |
+| `LOAD_INHIBIT_MV` | 2400 | **2500** | datasheet alt sınırının altına hiç yük bağlanmaz |
+| `MIN_VALID_MV` / `MAX_VALID_MV` | 2700 / 4250 | aynı | 4250 = şarj toleransının üst ucu |
+| `MAX_CHARGE_STAGE_MS` | 2 saat | **6 saat** | düz platoda tek 70 mV'luk basamak 2–3 saat sürebilir |
+| `MAX_RUN_MS` | 24 saat | **48 saat** | ≈12 saat deşarj + şarj (şarj cihazına bağlı) |
+
+Gerilim ölçeği 2,80–4,20 V, adım %5 = 70 mV. PX803035'in ayarı
+`BatteryConfig.h.px803035` dosyasında duruyor.
+
+12,2 Ω yük bu hücrede 0,23–0,34 A (≈0,1C) çeker, tam deşarj 11–12 saat sürer. Yük
+direnci değiştiyse yeniden ölçüp hem firmware'e hem `BATTERY["load_ohms"]`'a yaz.
 
 ## Çalıştırmak
 
@@ -30,31 +46,23 @@ pip install -r requirements.txt
 python scripts/plot_voltage.py
 ```
 
-Argüman almaz; hangi bataryayı işleyeceği `scripts/plot_voltage.py` başındaki
-`BATTERY` blokundan gelir ve bu dalda o blok PX803035'e ayarlıdır:
+Script şu dosyaları bekler. Yoksa ne eksik olduğunu söyleyip çıkar:
 
-```
-Batarya: Power-Xtra PX803035 (3,7 V / 800 mAh Li-Po)
-Girdi:   data/measurements-charge-800mah.csv (15 cift), data/measurements-discharge-800mah.csv (16 cift)
-Yazilan:
-  graphs/voltage_overlay-800mah-light.png
-  ...
-  data/lookup-discharge-800mah.csv
-```
+- `data/measurements-discharge-mj1.csv`: faz 1, yük yönündeki çiftler
+- `data/measurements-charge-mj1.csv`: faz 2, şarj yönündeki çiftler
 
-Listelenen dosyalar üzerine yazılır. Çıktı deterministiktir — veri değişmediyse
-PNG'ler bayt bayt aynı çıkar. SVG'ler hariç: matplotlib içlerine üretim tarihi ve
-rastgele `clip-path` id'leri koyduğu için içerikçe aynı, baytça farklı olurlar.
+Ham seri çıktı `data/raw_dump-mj1.log` olarak saklanmalı. Çıktılar `graphs/*-mj1*`
+ve `data/lookup-*-mj1.csv`.
 
-Bu hücrenin özellikleri (`load_ohms=12,20` ölçüm, `capacity_mah=800` etiketten),
-`BATTERY` bloğunun nasıl doldurulacağı ve yeni bir batarya nasıl eklenir — hepsi
-`main` dalındaki raporun "Kodu çalıştırmak" bölümünde.
+`BATTERY` bloğundaki eksen sınırları ve açıklama metinleri datasheet'e göre
+**tahmini başlangıç değerleridir**. İlk veri gelince grafiklere bakıp düzeltilmeli.
 
 ## Depodaki dallar
 
 | Dal | Ne taşır |
 |---|---|
-| `main` | Rapor: iki bataryanın da verisi, tabloları, grafikleri ve anlatımı |
-| `px103049` | PX103049 (1500 mAh) — kendi verisi, grafikleri, `BATTERY` ayarı |
-| **`px803035`** | **PX803035 (800 mAh) — burası** |
+| `main` | Rapor: ölçülen bataryaların verisi, tabloları, grafikleri ve anlatımı |
+| `px103049` | PX103049 (1500 mAh Li-Po) |
+| `px803035` | PX803035 (800 mAh Li-Po) |
+| **`inr18650mj1`** | **LG INR18650 MJ1 (3400 mAh Li-ion) — burası, ölçüm bekliyor** |
 | `archive/sarj`, `archive/ikinci-olcum` | eski ölçüm dalları, pasif |
