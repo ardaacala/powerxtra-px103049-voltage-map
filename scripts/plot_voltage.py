@@ -81,30 +81,37 @@ BATTERY = dict(
     # Uc durum grafiginin ekseni ve metinleri. Sinirlar elle veriliyor ki
     # kaydedilmis grafikler yeniden uretildiginde birebir ayni ciksin.
     state_label="Şarj olurken",
-    state_footnote=("Tek koşu, iki faz: önce yük yönünde (12,2 Ω, ≈0,23–0,34 A), "
-                    "sonra şarj yönünde. 60 s dinlenme; ADC kalibre edilmedi."),
+    state_footnote=("Tek koşu, iki faz: 17 çift yük yönünde (12,2 Ω, 0,23–0,32 A), "
+                    "17 çift şarj yönünde (%90'da kesildi). 60 s dinlenme; ADC kalibre edilmedi."),
     state_xlim=(2.85, 4.20),
-    state_ylim=(2.75, 4.26),
-    state_delta_ylim=(-100, 300),
-    state_note_x=3.40,
+    state_ylim=(2.75, 4.15),
+    state_delta_ylim=(-130, 130),
+    state_note_x=3.00,
+    # Iki seri de ~4,0 V'ta bitiyor; referans notu tek satir ve yuk etiketinin
+    # ustunde kalsin diye cizginin ucuna yakin.
+    state_ref_note="dinlenmiş = eksen (veri değil)",
+    state_ref_note_offset=(9, -4),
 
     # --- Sarj ayrinti grafigi (charge_stem) ---
-    charge_ylim=(2.75, 4.26),
+    charge_ylim=(2.85, 4.26),
     charge_xlim=(-4, 104),
-    charge_delta_ylim=(0, 300),
-    charge_ceiling_note="4,20 V şarj tavanı",
-    charge_notes=[],
-    charge_footnote=("Tek koşunun ikinci fazı (deşarjdan sonra şarj). "
+    charge_delta_ylim=(0, 120),
+    charge_ceiling_note=("4,20 V şarj tavanı — ulaşılmadı: kart %90'dan (4060 mV) "
+                         "sonra yeniden başladı"),
+    charge_notes=[("+58 … +92 mV, son çiftte +30 mV", 45, 108, "center")],
+    charge_footnote=("17 ölçüm çifti, %10 → %90 — tek koşunun ikinci fazı (deşarjdan sonra). "
                      "Dinlenme 60 s; ADC kalibre edilmedi."),
 
     # --- Yuk ayrinti grafigi (load_stem) ---
-    load_ylim=(2.75, 4.26),
+    load_ylim=(2.75, 4.10),
     load_xlim=(-4, 104),
-    load_delta_ylim=(-100, 0),
+    load_delta_ylim=(-110, 0),
     load_floor_note="2,80 V — firmware'in boş kabulü (datasheet alt sınırı 2,50 V)",
-    load_notes=[],
-    load_footnote=("Tek koşunun ilk fazı, 12,2 Ω dummy load (≈0,23–0,34 A, ≈0,1C). "
-                   "Dinlenme 60 s; ADC kalibre edilmedi."),
+    # Notun sol ucu: alttaki iki noktanin (%0, %5) ustune binmesin.
+    load_floor_note_x=30,
+    load_notes=[("boşaldıkça büyüyor: −50 … −94 mV", 50, -97, "center")],
+    load_footnote=("17 ölçüm çifti, %80 → %0 — tek koşunun ilk fazı, 12,2 Ω dummy load "
+                   "(0,23–0,32 A, ≈0,1C), 10,1 saat. Dinlenme 60 s; ADC kalibre edilmedi."),
 )
 DATA = ROOT / "data" / BATTERY["charge_csv"]
 DATA_DISCHARGE = ROOT / "data" / BATTERY["load_csv"]
@@ -360,7 +367,7 @@ def render_discharge(rows: list[dict], theme_name: str, svg: bool = False) -> Pa
     ax.axhline(EMPTY_MV / 1000, color=t["muted"], linewidth=1,
                linestyle=(0, (4, 4)), zorder=2)
     ax.annotate(BATTERY["load_floor_note"],
-                xy=(BATTERY["load_xlim"][0] + 1, EMPTY_MV / 1000),
+                xy=(BATTERY["load_floor_note_x"], EMPTY_MV / 1000),
                 xytext=(0, 6), textcoords="offset points",
                 color=t["muted"], fontsize=9.5, va="bottom", ha="left")
 
@@ -456,8 +463,9 @@ def render_states(
                     color=t["text"], fontsize=11, fontweight="bold",
                     va=va, ha="left")
     # Referans ayri tutulur: soluk ve kalin degil, cunku olcum degil.
-    ax.annotate("dinlenmiş = eksen\n(veri değil)", xy=(ref_x[-1], ref_x[-1]),
-                xytext=(9, -9), textcoords="offset points", color=t["muted"],
+    ax.annotate(BATTERY["state_ref_note"], xy=(ref_x[-1], ref_x[-1]),
+                xytext=BATTERY["state_ref_note_offset"], textcoords="offset points",
+                color=t["muted"],
                 fontsize=9.5, va="top", ha="left")
 
     ax.set_title(title, color=t["text"], fontsize=14, fontweight="bold",

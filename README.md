@@ -1,10 +1,46 @@
 # `inr18650mj1` — LG INR18650 MJ1 (3,635 V / 3400 mAh Li-ion)
 
-Bu dal **yalnızca bu hücreye** aittir. Hücre **henüz ölçülmedi**: dalda şimdilik
-yalnızca bu hücreye ayarlanmış script var, `data/` ve `graphs/` ilk koşudan sonra
-dolacak. Önceki hücrelerin dosyaları kendi dallarında (`px103049`, `px803035`).
+Bu dal **yalnızca bu hücreye** aittir: kendi ölçüm verisi, kendi grafikleri ve
+`BATTERY` bloğu bu hücreye ayarlanmış script. Önceki hücrelerin dosyaları kendi
+dallarında (`px103049`, `px803035`).
 
 **Ölçümün anlatıldığı rapor `main` dalındadır.**
+
+## İlk koşu
+
+Tek koşu, iki faz. Veri kartın Wi-Fi'sinden `/dump` ile 5 Ekim 2026'da çekildi:
+[`data/raw_dump-mj1.log`](data/raw_dump-mj1.log), hiç düzenlenmedi.
+
+| | Deşarj (faz 1) | Şarj (faz 2) |
+|---|---|---|
+| Çiftler | 17, eşik %80 → %0 | 17, eşik %10 → %90 |
+| Başlangıç | 3985,75 mV (dinlenmiş) | 2920,06 mV (dinlenmiş) |
+| Son çift | yük altında 2797 mV, toparlanınca 2892 mV | şarjda 4060 mV, dinlenince 4030 mV |
+| Dinlenmişten fark | −50 … −94 mV, alt uçta büyüyor | +58 … +92 mV, son çiftte +30 mV |
+| Anahtar kapalı süre | 10,1 saat | 8,9 saat |
+| Akım | 0,23–0,32 A (`loaded_mv / 12,2 Ω`) | ölçülmedi |
+
+- **Çekilen kapasite:** Deşarj fazında akımı `loaded_mv / 12,2 Ω` ile hesaplayıp
+  süreyle çarpınca yaklaşık **2890 mAh** çıkıyor (3,99 V → yük altında 2,80 V).
+  Koşu dolu hücreyle değil %85 civarından başladığı için etiketteki 3400 mAh'in
+  altında kalması bekleniyor.
+- **Şarj tamamlanmadı:** Kayıt `state=CHARGING` olarak kalmış. Kart şarj fazının
+  8,9. saatinde, %95 eşiğinden önce yeniden başladı. Firmware koşuyu reset sonrası
+  sürdürmediği için %95 ve %100 çiftleri yok.
+- **ADC kalibre edilmedi:** Mutlak değerler multimetreyle karşılaştırılmadı.
+
+| Dosya | İçerik |
+|---|---|
+| `data/raw_dump-mj1.log` | Cihazdan alınan ham çıktı |
+| `data/measurements-discharge-mj1.csv` | Faz 1, yük yönünde 17 çift |
+| `data/measurements-charge-mj1.csv` | Faz 2, şarj yönünde 17 çift |
+| `data/lookup-discharge-mj1.csv` | Yük altındaki gerilimden dinlenmiş karşılığı (10 mV adım) |
+| `data/lookup-charge-mj1.csv` | Şarjdaki gerilimden dinlenmiş karşılığı (10 mV adım) |
+| `graphs/state_overlay-mj1-*` | Üç durum üst üste |
+| `graphs/voltage_overlay-mj1-*` | Şarj yönü ayrıntısı |
+| `graphs/discharge_overlay-mj1-*` | Deşarj yönü ayrıntısı |
+
+![Üç durum üst üste](graphs/state_overlay-mj1-light.png)
 
 ## Hücre
 
@@ -46,16 +82,13 @@ pip install -r requirements.txt
 python scripts/plot_voltage.py
 ```
 
-Script şu dosyaları bekler. Yoksa ne eksik olduğunu söyleyip çıkar:
+Girdi iki ölçüm CSV'si: `data/measurements-discharge-mj1.csv` ve
+`data/measurements-charge-mj1.csv`. İkisi de ham dump'taki `# PHASE` bloklarının
+birebir kopyası. Yoksa script ne eksik olduğunu söyleyip çıkar. Çıktılar
+`graphs/*-mj1*` ve `data/lookup-*-mj1.csv`; üzerine yazılır.
 
-- `data/measurements-discharge-mj1.csv`: faz 1, yük yönündeki çiftler
-- `data/measurements-charge-mj1.csv`: faz 2, şarj yönündeki çiftler
-
-Ham seri çıktı `data/raw_dump-mj1.log` olarak saklanmalı. Çıktılar `graphs/*-mj1*`
-ve `data/lookup-*-mj1.csv`.
-
-`BATTERY` bloğundaki eksen sınırları ve açıklama metinleri datasheet'e göre
-**tahmini başlangıç değerleridir**. İlk veri gelince grafiklere bakıp düzeltilmeli.
+`BATTERY` bloğundaki eksen sınırları, notlar ve dipnotlar bu koşunun verisine göre
+ayarlı. Yeni bir koşu eklenirse yeniden bakılmalı.
 
 ## Depodaki dallar
 
@@ -64,5 +97,5 @@ ve `data/lookup-*-mj1.csv`.
 | `main` | Rapor: ölçülen bataryaların verisi, tabloları, grafikleri ve anlatımı |
 | `px103049` | PX103049 (1500 mAh Li-Po) |
 | `px803035` | PX803035 (800 mAh Li-Po) |
-| **`inr18650mj1`** | **LG INR18650 MJ1 (3400 mAh Li-ion) — burası, ölçüm bekliyor** |
+| **`inr18650mj1`** | **LG INR18650 MJ1 (3400 mAh Li-ion) — burası** |
 | `archive/sarj`, `archive/ikinci-olcum` | eski ölçüm dalları, pasif |
